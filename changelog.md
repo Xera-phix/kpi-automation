@@ -10,3 +10,5 @@
 | 2026-01-27 10:19:15 | EDIT | PLID Issue VO | Wasim | Resource: Umang → Wasim |
 | 2026-01-27 10:19:22 | EDIT | Implementation - Standby Mode | Chethan | Work_Hours: 300 → 88 |
 | 2026-01-27 10:19:26 | EDIT | Build 2 | Chethan | Percent_Complete: 11 → 58 |
+| 2026-01-30 09:05:07 | EDIT | Cybersecurity Update | Umang | Percent_Complete: 48 → 17 |
+| 2026-01-30 09:05:08 | EDIT | Build 2 | Chethan | Percent_Complete: 58 → 39 |

@@ -1,6 +1,6 @@
 ID,Task,Resource,Work_Hours,Baseline_Hours,Variance,Start_Date,Finish_Date,Percent_Complete,Type,Parent_Task
-99,Cybersecurity Update,Umang,20,69,-49,2025-03-21,2025-03-26,48,Fixed Work,
-104,Build 2,Chethan,1842,1607,235,2025-09-01,2027-01-22,58,Fixed Duration,
+99,Cybersecurity Update,Umang,20,69,-49,2025-03-21,2025-03-26,17,Fixed Work,
+104,Build 2,Chethan,1842,1607,235,2025-09-01,2027-01-22,39,Fixed Duration,
 105,Standby Mode VO,Wasim,66,14,52,2025-11-25,2025-12-05,0,Fixed Work,Build 2
 106,SCS - Standby Mode,Chethan,20,0,20,2025-11-25,2025-11-27,0,Fixed Work,Standby Mode VO
 107,Implementation - Standby Mode,Chethan,88,0,88,2025-11-27,2025-12-12,0,Fixed Work,Standby Mode VO

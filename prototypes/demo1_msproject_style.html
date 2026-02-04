@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KPI Dashboard Prototype #1 - MS Project Style</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 12px;
+            background: #f3f3f3;
+            color: #1a1a1a;
+        }
+
+        /* Ribbon Header - MS Project Style */
+        .ribbon {
+            background: linear-gradient(180deg, #217346 0%, #185a34 100%);
+            color: white;
+            padding: 8px 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            border-bottom: 1px solid #0d3d1f;
+        }
+
+        .ribbon h1 {
+            font-size: 16px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ribbon-tabs {
+            display: flex;
+            gap: 2px;
+            margin-left: 30px;
+        }
+
+        .ribbon-tab {
+            padding: 6px 16px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px 4px 0 0;
+            cursor: pointer;
+            font-size: 11px;
+        }
+
+        .ribbon-tab.active {
+            background: white;
+            color: #185a34;
+        }
+
+        .ribbon-tab:hover:not(.active) {
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* Toolbar */
+        .toolbar {
+            background: #fafafa;
+            border-bottom: 1px solid #d4d4d4;
+            padding: 10px 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .tool-group {
+            display: flex;
+            gap: 8px;
+            padding-right: 15px;
+            border-right: 1px solid #e0e0e0;
+        }
+
+        .tool-group:last-child {
+            border-right: none;
+        }
+
+        .tool-btn {
+            padding: 6px 12px;
+            background: white;
+            border: 1px solid #c4c4c4;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .tool-btn:hover {
+            background: #e8f5e9;
+            border-color: #217346;
+        }
+
+        .tool-btn.primary {
+            background: #217346;
+            color: white;
+            border-color: #185a34;
+        }
+
+        .tool-btn.primary:hover {
+            background: #185a34;
+        }
+
+        /* Timeline Strip */
+        .timeline-strip {
+            background: #fff;
+            border-bottom: 1px solid #d4d4d4;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            position: relative;
+            overflow-x: auto;
+        }
+
+        .timeline-container {
+            display: flex;
+            align-items: center;
+            min-width: 100%;
+            position: relative;
+            height: 50px;
+        }
+
+        .timeline-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #d4d4d4;
+        }
+
+        .timeline-today {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e74c3c;
+            left: 35%;
+        }
+
+        .timeline-today::after {
+            content: 'Today';
+            position: absolute;
+            top: -5px;
+            left: 5px;
+            font-size: 10px;
+            color: #e74c3c;
+            font-weight: 600;
+        }
+
+        .milestone {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #2c3e50;
+            transform: rotate(45deg);
+            cursor: pointer;
+        }
+
+        .milestone::after {
+            content: attr(data-label);
+            position: absolute;
+            top: 18px;
+            left: -20px;
+            width: 60px;
+            text-align: center;
+            font-size: 9px;
+            transform: rotate(-45deg);
+            color: #666;
+        }
+
+        /* Main Content Area */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 180px);
+        }
+
+        /* Task Table */
+        .task-table-container {
+            flex: 0 0 65%;
+            overflow: auto;
+            border-right: 3px solid #217346;
+            background: white;
+        }
+
+        .task-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .task-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .task-table th {
+            background: #f0f0f0;
+            border: 1px solid #d4d4d4;
+            padding: 8px 6px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+        }
+
+        .task-table th.sortable {
+            cursor: pointer;
+        }
+
+        .task-table th.sortable:hover {
+            background: #e4e4e4;
+        }
+
+        .task-table td {
+            border: 1px solid #e8e8e8;
+            padding: 6px 8px;
+            vertical-align: middle;
+        }
+
+        .task-table tr:hover {
+            background: #f5f9f6;
+        }
+
+        .task-table tr.parent-row {
+            background: #e8f5e9;
+            font-weight: 600;
+        }
+
+        .task-table tr.parent-row:hover {
+            background: #d4edda;
+        }
+
+        /* Row indicator column */
+        .row-indicator {
+            width: 30px;
+            text-align: center;
+            background: #fafafa;
+            color: #888;
+            font-size: 10px;
+        }
+
+        .task-icons {
+            width: 50px;
+            text-align: center;
+        }
+
+        .task-icons span {
+            cursor: pointer;
+            margin: 0 2px;
+        }
+
+        /* Task name with hierarchy */
+        .task-name {
+            min-width: 200px;
+            max-width: 250px;
+        }
+
+        .task-name.level-0 { padding-left: 5px; }
+        .task-name.level-1 { padding-left: 25px; }
+        .task-name.level-2 { padding-left: 45px; }
+
+        .task-name.level-1::before,
+        .task-name.level-2::before {
+            content: "↳ ";
+            color: #aaa;
+        }
+
+        /* Editable cells */
+        .editable {
+            cursor: pointer;
+            position: relative;
+        }
+
+        .editable:hover {
+            background: #fffde7 !important;
+            outline: 1px solid #ffc107;
+        }
+
+        .editable:focus {
+            background: #fff !important;
+            outline: 2px solid #217346;
+        }
+
+        .editable.modified {
+            background: #e8f5e9 !important;
+        }
+
+        /* Number columns */
+        .col-num {
+            text-align: right;
+            font-family: 'Consolas', 'Courier New', monospace;
+            min-width: 60px;
+        }
+
+        .col-percent {
+            text-align: center;
+            min-width: 50px;
+        }
+
+        .col-date {
+            min-width: 85px;
+            font-family: 'Consolas', monospace;
+        }
+
+        /* Variance styling */
+        .variance-positive {
+            color: #c0392b;
+            font-weight: 600;
+        }
+
+        .variance-negative {
+            color: #27ae60;
+            font-weight: 600;
+        }
+
+        .variance-zero {
+            color: #888;
+        }
+
+        /* Resource badge */
+        .resource-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        .resource-Chethan { background: #c8e6c9; color: #2e7d32; }
+        .resource-Umang { background: #bbdefb; color: #1565c0; }
+        .resource-Wasim { background: #ffe0b2; color: #e65100; }
+        .resource-Mengmei { background: #f8bbd9; color: #c2185b; }
+        .resource-Steven { background: #b2dfdb; color: #00695c; }
+
+        /* Progress bar in cell */
+        .progress-cell {
+            min-width: 80px;
+        }
+
+        .progress-bar {
+            height: 16px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50 0%, #81c784 100%);
+            transition: width 0.3s;
+        }
+
+        .progress-fill.complete {
+            background: linear-gradient(90deg, #2e7d32 0%, #4caf50 100%);
+        }
+
+        .progress-text {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        /* Gantt Chart */
+        .gantt-container {
+            flex: 1;
+            overflow: auto;
+            background: white;
+        }
+
+        .gantt-header {
+            display: flex;
+            background: #f0f0f0;
+            border-bottom: 1px solid #d4d4d4;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .gantt-month {
+            flex: 0 0 120px;
+            padding: 8px;
+            text-align: center;
+            border-right: 1px solid #d4d4d4;
+            font-weight: 600;
+            font-size: 11px;
+        }
+
+        .gantt-body {
+            position: relative;
+        }
+
+        .gantt-row {
+            height: 29px;
+            border-bottom: 1px solid #e8e8e8;
+            position: relative;
+            display: flex;
+        }
+
+        .gantt-row.parent-row {
+            background: #e8f5e9;
+        }
+
+        .gantt-cell {
+            flex: 0 0 120px;
+            border-right: 1px solid #f0f0f0;
+            position: relative;
+        }
+
+        .gantt-bar {
+            position: absolute;
+            height: 18px;
+            top: 5px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            padding: 0 6px;
+            font-size: 9px;
+            color: white;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .gantt-bar:hover {
+            filter: brightness(1.1);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .gantt-bar.resource-Chethan { background: linear-gradient(90deg, #4caf50, #66bb6a); }
+        .gantt-bar.resource-Umang { background: linear-gradient(90deg, #2196f3, #42a5f5); }
+        .gantt-bar.resource-Wasim { background: linear-gradient(90deg, #ff9800, #ffb74d); }
+        .gantt-bar.resource-Mengmei { background: linear-gradient(90deg, #e91e63, #f06292); }
+        .gantt-bar.resource-Steven { background: linear-gradient(90deg, #009688, #4db6ac); }
+
+        .gantt-bar-progress {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.2);
+            border-radius: 3px 0 0 3px;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            background: #217346;
+            color: white;
+            padding: 6px 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+        }
+
+        .status-item {
+            display: flex;
+            gap: 15px;
+        }
+
+        /* Command Input (AI Feature Preview) */
+        .command-bar {
+            background: #1a1a2e;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .command-input {
+            flex: 1;
+            background: #16213e;
+            border: 1px solid #0f3460;
+            border-radius: 6px;
+            padding: 10px 15px;
+            color: white;
+            font-size: 13px;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        .command-input::placeholder {
+            color: #7f8c8d;
+        }
+
+        .command-input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+        }
+
+        .command-btn {
+            padding: 10px 20px;
+            background: #3498db;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .command-btn:hover {
+            background: #2980b9;
+        }
+
+        .ai-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            background: #2c3e50;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: none;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.show {
+            display: block;
+        }
+
+        .toast.success {
+            background: #27ae60;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Summary Cards */
+        .summary-strip {
+            background: white;
+            border-bottom: 1px solid #d4d4d4;
+            padding: 10px 20px;
+            display: flex;
+            gap: 30px;
+        }
+
+        .summary-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .summary-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .summary-icon.tasks { background: #e3f2fd; }
+        .summary-icon.hours { background: #e8f5e9; }
+        .summary-icon.variance { background: #ffebee; }
+        .summary-icon.progress { background: #fff3e0; }
+
+        .summary-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .summary-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .summary-label {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <!-- Ribbon Header -->
+    <div class="ribbon">
+        <h1>📊 KPI Project Tracker</h1>
+        <div class="ribbon-tabs">
+            <div class="ribbon-tab active">Task View</div>
+            <div class="ribbon-tab">Resource View</div>
+            <div class="ribbon-tab">Timeline</div>
+            <div class="ribbon-tab">Reports</div>
+        </div>
+        <div style="margin-left: auto; font-size: 11px; opacity: 0.8;">
+            PROTOTYPE DEMO #1 - MS Project Style
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <div class="tool-group">
+            <button class="tool-btn primary" onclick="showToast('Changes saved to CSV', 'success')">💾 Save</button>
+            <button class="tool-btn">↩️ Undo</button>
+            <button class="tool-btn">↪️ Redo</button>
+        </div>
+        <div class="tool-group">
+            <button class="tool-btn">➕ Add Task</button>
+            <button class="tool-btn">📋 Paste</button>
+            <button class="tool-btn">🗑️ Delete</button>
+        </div>
+        <div class="tool-group">
+            <button class="tool-btn">📅 Set Baseline</button>
+            <button class="tool-btn">📊 Update Progress</button>
+        </div>
+        <div class="tool-group">
+            <select style="padding: 6px; border: 1px solid #c4c4c4; border-radius: 3px; font-size: 11px;">
+                <option>All Resources</option>
+                <option>Chethan</option>
+                <option>Umang</option>
+                <option>Wasim</option>
+                <option>Mengmei</option>
+                <option>Steven</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Summary Strip -->
+    <div class="summary-strip">
+        <div class="summary-card">
+            <div class="summary-icon tasks">📋</div>
+            <div class="summary-info">
+                <span class="summary-value" id="total-tasks">18</span>
+                <span class="summary-label">Total Tasks</span>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-icon hours">⏱️</div>
+            <div class="summary-info">
+                <span class="summary-value" id="total-hours">3,318h</span>
+                <span class="summary-label">Total Work</span>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-icon variance">📈</div>
+            <div class="summary-info">
+                <span class="summary-value" id="total-variance" style="color: #c0392b;">+469h</span>
+                <span class="summary-label">Variance</span>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-icon progress">✅</div>
+            <div class="summary-info">
+                <span class="summary-value" id="avg-progress">28%</span>
+                <span class="summary-label">Avg Progress</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-container">
+        <!-- Task Table -->
+        <div class="task-table-container">
+            <table class="task-table" id="taskTable">
+                <thead>
+                    <tr>
+                        <th class="row-indicator">#</th>
+                        <th class="task-icons">📌</th>
+                        <th class="sortable">Task Name</th>
+                        <th class="sortable col-num">Duration</th>
+                        <th class="sortable col-percent">% Done</th>
+                        <th class="sortable col-num">Baseline</th>
+                        <th class="sortable col-num">Work</th>
+                        <th class="sortable col-num">Variance</th>
+                        <th class="sortable col-date">Start</th>
+                        <th class="sortable col-date">Finish</th>
+                        <th>Type</th>
+                        <th>Resource</th>
+                    </tr>
+                </thead>
+                <tbody id="taskTableBody">
+                    <!-- Rows populated by JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Gantt Chart -->
+        <div class="gantt-container">
+            <div class="gantt-header" id="ganttHeader">
+                <!-- Months populated by JS -->
+            </div>
+            <div class="gantt-body" id="ganttBody">
+                <!-- Gantt rows populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Command Bar -->
+    <div class="command-bar">
+        <span class="ai-badge">✨ AI</span>
+        <input type="text" class="command-input" id="commandInput" 
+               placeholder="Try: 'Add 5 hours to Fault Code Reporting for Wasim' or 'Set Bug Fixes to 50% complete'">
+        <button class="command-btn" onclick="processCommand()">
+            ⚡ Execute
+        </button>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <div class="status-item">
+            <span>📁 projects.csv</span>
+            <span>|</span>
+            <span>Last saved: Just now</span>
+        </div>
+        <div class="status-item">
+            <span>Ready</span>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Project Data (matches your CSV)
+        const projects = [
+            { id: 99, task: "Cybersecurity Update", resource: "Umang", work: 20, baseline: 69, variance: -49, start: "2025-03-21", finish: "2025-03-26", percent: 48, type: "Fixed Work", parent: null, level: 0 },
+            { id: 104, task: "Build 2", resource: "Chethan", work: 1842, baseline: 1607, variance: 235, start: "2025-09-01", finish: "2027-01-22", percent: 58, type: "Fixed Duration", parent: null, level: 0 },
+            { id: 105, task: "Standby Mode VO", resource: "Wasim", work: 66, baseline: 14, variance: 52, start: "2025-11-25", finish: "2025-12-05", percent: 0, type: "Fixed Work", parent: "Build 2", level: 1 },
+            { id: 106, task: "SCS - Standby Mode", resource: "Chethan", work: 20, baseline: 0, variance: 20, start: "2025-11-25", finish: "2025-11-27", percent: 0, type: "Fixed Work", parent: "Standby Mode VO", level: 2 },
+            { id: 107, task: "Implementation - Standby Mode", resource: "Chethan", work: 88, baseline: 0, variance: 88, start: "2025-11-27", finish: "2025-12-12", percent: 0, type: "Fixed Work", parent: "Standby Mode VO", level: 2 },
+            { id: 108, task: "PLID Issue VO", resource: "Wasim", work: 196, baseline: 196, variance: 0, start: "2025-09-01", finish: "2025-11-10", percent: 5, type: "Fixed Duration", parent: null, level: 0 },
+            { id: 109, task: "System Support", resource: "Umang", work: 40, baseline: 40, variance: 0, start: "2025-09-01", finish: "2025-09-01", percent: 100, type: "Fixed Work", parent: "PLID Issue VO", level: 1 },
+            { id: 110, task: "SCS - PLID Issue", resource: "Umang", work: 56, baseline: 56, variance: 0, start: "2025-10-14", finish: "2025-10-22", percent: 0, type: "Fixed Work", parent: "PLID Issue VO", level: 1 },
+            { id: 111, task: "Implementation - PLID Issue", resource: "Umang", work: 100, baseline: 100, variance: 0, start: "2025-10-23", finish: "2025-11-10", percent: 0, type: "Fixed Work", parent: "PLID Issue VO", level: 1 },
+            { id: 112, task: "Fault Monitoring Reporting B2", resource: "Umang", work: 372, baseline: 342, variance: 30, start: "2025-09-15", finish: "2025-12-04", percent: 11, type: "Fixed Duration", parent: null, level: 0 },
+            { id: 113, task: "Fault Code Reporting SwDF", resource: "Wasim", work: 222, baseline: 310, variance: -88, start: "2025-09-15", finish: "2025-10-22", percent: 0, type: "Fixed Work", parent: "Fault Monitoring Reporting B2", level: 1 },
+            { id: 114, task: "Fault Code Reporting Implementation", resource: "Wasim", work: 150, baseline: 120, variance: 30, start: "2025-10-22", finish: "2025-12-04", percent: 28, type: "Fixed Work", parent: "Fault Monitoring Reporting B2", level: 1 },
+            { id: 115, task: "Bug Fixes from B1", resource: "Chethan", work: 448, baseline: 327, variance: 121, start: "2025-09-01", finish: "2025-12-26", percent: 33, type: "Fixed Duration", parent: null, level: 0 },
+            { id: 116, task: "SCS for Bug Fixes", resource: "Chethan", work: 0, baseline: 40, variance: -40, start: "2025-09-01", finish: "2025-09-01", percent: 0, type: "Fixed Work", parent: "Bug Fixes from B1", level: 1 },
+            { id: 120, task: "CCP00559148 EBRC slave checkback", resource: "Mengmei", work: 40, baseline: 40, variance: 0, start: "2025-11-25", finish: "2025-12-15", percent: 60, type: "Fixed Work", parent: "Bug Fixes from B1", level: 1 },
+            { id: 121, task: "CCP00555604 Fix Compilation Issue", resource: "Mengmei", work: 40, baseline: 40, variance: 0, start: "2025-12-01", finish: "2025-12-22", percent: 0, type: "Fixed Work", parent: "Bug Fixes from B1", level: 1 },
+            { id: 122, task: "CCP00558513 ETS Set/Clear", resource: "Mengmei", work: 40, baseline: 40, variance: 0, start: "2025-12-08", finish: "2025-12-12", percent: 60, type: "Fixed Work", parent: "Bug Fixes from B1", level: 1 },
+            { id: 123, task: "CCP00555244 Train Halt Comm Loss", resource: "Chethan", work: 40, baseline: 40, variance: 0, start: "2025-12-01", finish: "2025-12-05", percent: 20, type: "Fixed Work", parent: "Bug Fixes from B1", level: 1 },
+            { id: 124, task: "CCP00558515 SuRS.32791", resource: "Steven", work: 8, baseline: 8, variance: 0, start: "2025-09-01", finish: "2025-09-02", percent: 100, type: "Fixed Work", parent: "Bug Fixes from B1", level: 1 }
+        ];
+
+        // Months for Gantt header
+        const months = ['Sep 25', 'Oct 25', 'Nov 25', 'Dec 25', 'Jan 26', 'Feb 26', 'Mar 26', 'Q2 26', 'Q3 26', 'Q4 26', '2027'];
+
+        function formatDate(dateStr) {
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        function formatHours(h) {
+            return h.toLocaleString() + 'h';
+        }
+
+        function getDuration(start, finish) {
+            const s = new Date(start);
+            const f = new Date(finish);
+            const days = Math.ceil((f - s) / (1000 * 60 * 60 * 24));
+            return days + 'd';
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('taskTableBody');
+            tbody.innerHTML = '';
+
+            projects.forEach((p, idx) => {
+                const isParent = projects.some(proj => proj.parent === p.task);
+                const varianceClass = p.variance > 0 ? 'variance-positive' : (p.variance < 0 ? 'variance-negative' : 'variance-zero');
+                const varianceDisplay = p.variance > 0 ? `+${p.variance}` : p.variance;
+
+                const row = document.createElement('tr');
+                row.className = isParent ? 'parent-row' : '';
+                row.innerHTML = `
+                    <td class="row-indicator">${p.id}</td>
+                    <td class="task-icons">
+                        <span title="Task Mode">📋</span>
+                        <span title="Complete">✓</span>
+                    </td>
+                    <td class="task-name level-${p.level}">${p.task}</td>
+                    <td class="col-num">${getDuration(p.start, p.finish)}</td>
+                    <td class="col-percent">
+                        <div class="progress-bar">
+                            <div class="progress-fill ${p.percent === 100 ? 'complete' : ''}" style="width: ${p.percent}%"></div>
+                            <span class="progress-text">${p.percent}%</span>
+                        </div>
+                    </td>
+                    <td class="col-num">${formatHours(p.baseline)}</td>
+                    <td class="col-num editable" contenteditable="true" data-field="work" data-id="${p.id}">${formatHours(p.work)}</td>
+                    <td class="col-num ${varianceClass}">${varianceDisplay}h</td>
+                    <td class="col-date">${formatDate(p.start)}</td>
+                    <td class="col-date editable" contenteditable="true" data-field="finish" data-id="${p.id}">${formatDate(p.finish)}</td>
+                    <td>${p.type.replace('Fixed ', '')}</td>
+                    <td><span class="resource-badge resource-${p.resource}">${p.resource}</span></td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // Add edit handlers
+            document.querySelectorAll('.editable').forEach(cell => {
+                cell.addEventListener('blur', handleCellEdit);
+                cell.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        cell.blur();
+                    }
+                });
+            });
+        }
+
+        function renderGantt() {
+            // Header
+            const header = document.getElementById('ganttHeader');
+            header.innerHTML = months.map(m => `<div class="gantt-month">${m}</div>`).join('');
+
+            // Body
+            const body = document.getElementById('ganttBody');
+            body.innerHTML = '';
+
+            projects.forEach(p => {
+                const isParent = projects.some(proj => proj.parent === p.task);
+                const row = document.createElement('div');
+                row.className = `gantt-row ${isParent ? 'parent-row' : ''}`;
+                
+                // Create cells for each month
+                let cellsHtml = '';
+                for (let i = 0; i < months.length; i++) {
+                    cellsHtml += '<div class="gantt-cell"></div>';
+                }
+                row.innerHTML = cellsHtml;
+
+                // Add the bar (simplified positioning)
+                const startMonth = new Date(p.start).getMonth() - 8; // Sept = 0
+                const barLeft = Math.max(0, startMonth) * 120 + 10;
+                const duration = (new Date(p.finish) - new Date(p.start)) / (1000 * 60 * 60 * 24 * 30) * 120;
+                const barWidth = Math.max(40, Math.min(duration, 400));
+
+                const bar = document.createElement('div');
+                bar.className = `gantt-bar resource-${p.resource}`;
+                bar.style.left = barLeft + 'px';
+                bar.style.width = barWidth + 'px';
+                bar.innerHTML = `<div class="gantt-bar-progress" style="width: ${p.percent}%"></div>${p.resource}`;
+                bar.title = `${p.task}\n${p.resource}: ${p.work}h\n${p.percent}% complete`;
+                
+                row.appendChild(bar);
+                body.appendChild(row);
+            });
+        }
+
+        function handleCellEdit(e) {
+            const cell = e.target;
+            const id = parseInt(cell.dataset.id);
+            const field = cell.dataset.field;
+            const value = cell.textContent.replace('h', '').replace(',', '');
+
+            const project = projects.find(p => p.id === id);
+            if (project) {
+                if (field === 'work') {
+                    const newWork = parseInt(value) || project.work;
+                    project.variance = newWork - project.baseline;
+                    project.work = newWork;
+                }
+                cell.classList.add('modified');
+                showToast(`Updated ${project.task}: ${field} = ${value}`, 'success');
+                renderTable();
+                updateSummary();
+            }
+        }
+
+        function updateSummary() {
+            const totalTasks = projects.length;
+            const totalWork = projects.reduce((sum, p) => sum + p.work, 0);
+            const totalVariance = projects.reduce((sum, p) => sum + p.variance, 0);
+            const avgProgress = Math.round(projects.reduce((sum, p) => sum + p.percent, 0) / projects.length);
+
+            document.getElementById('total-tasks').textContent = totalTasks;
+            document.getElementById('total-hours').textContent = totalWork.toLocaleString() + 'h';
+            document.getElementById('total-variance').textContent = (totalVariance > 0 ? '+' : '') + totalVariance + 'h';
+            document.getElementById('avg-progress').textContent = avgProgress + '%';
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast show ${type}`;
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function processCommand() {
+            const input = document.getElementById('commandInput');
+            const command = input.value.toLowerCase();
+
+            // Simple parsing
+            const addHoursMatch = command.match(/add (\d+) hours? to (.+?)(?:\s+for\s+(\w+))?$/i);
+            const setPercentMatch = command.match(/set (.+?) to (\d+)%/i);
+
+            if (addHoursMatch) {
+                const hours = parseInt(addHoursMatch[1]);
+                const taskQuery = addHoursMatch[2].trim();
+                const resource = addHoursMatch[3];
+
+                const project = projects.find(p => 
+                    p.task.toLowerCase().includes(taskQuery.toLowerCase()) &&
+                    (!resource || p.resource.toLowerCase() === resource.toLowerCase())
+                );
+
+                if (project) {
+                    project.work += hours;
+                    project.variance = project.work - project.baseline;
+                    showToast(`Added ${hours}h to "${project.task}" for ${project.resource}`, 'success');
+                    renderTable();
+                    renderGantt();
+                    updateSummary();
+                } else {
+                    showToast(`Task not found: ${taskQuery}`, 'error');
+                }
+            } else if (setPercentMatch) {
+                const taskQuery = setPercentMatch[1].trim();
+                const percent = parseInt(setPercentMatch[2]);
+
+                const project = projects.find(p => p.task.toLowerCase().includes(taskQuery.toLowerCase()));
+                if (project) {
+                    project.percent = percent;
+                    showToast(`Set "${project.task}" to ${percent}% complete`, 'success');
+                    renderTable();
+                    renderGantt();
+                } else {
+                    showToast(`Task not found: ${taskQuery}`, 'error');
+                }
+            } else {
+                showToast('Command not recognized. Try: "Add 5 hours to [task]" or "Set [task] to 50%"', 'error');
+            }
+
+            input.value = '';
+        }
+
+        // Handle Enter key in command input
+        document.getElementById('commandInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') processCommand();
+        });
+
+        // Initialize
+        renderTable();
+        renderGantt();
+        updateSummary();
+    </script>
+</body>
+</html>
