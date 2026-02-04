@@ -25,7 +25,7 @@ OUTPUT_FILE = SCRIPT_DIR / "dashboard.html"
 def load_projects():
     """Load projects from CSV."""
     projects = []
-    with open(PROJECTS_FILE, 'r', newline='', encoding='utf-8') as f:
+    with open(PROJECTS_FILE, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             projects.append(row)
@@ -35,8 +35,8 @@ def load_projects():
 def format_date(date_str):
     """Format date for display."""
     try:
-        dt = datetime.strptime(date_str, '%Y-%m-%d')
-        return dt.strftime('%b %d')
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        return dt.strftime("%b %d")
     except:
         return date_str
 
@@ -57,26 +57,26 @@ def get_resource_class(resource):
 def generate_task_rows(projects):
     """Generate HTML table rows for all tasks."""
     rows = []
-    
+
     for p in projects:
-        task_id = p['ID']
-        task_name = p['Task']
-        resource = p['Resource']
-        work = int(float(p['Work_Hours']))
-        baseline = int(float(p['Baseline_Hours']))
-        variance = int(float(p['Variance']))
-        start = format_date(p['Start_Date'])
-        finish = format_date(p['Finish_Date'])
-        percent = int(float(p['Percent_Complete']))
-        parent = p.get('Parent_Task', '')
-        
+        task_id = p["ID"]
+        task_name = p["Task"]
+        resource = p["Resource"]
+        work = int(float(p["Work_Hours"]))
+        baseline = int(float(p["Baseline_Hours"]))
+        variance = int(float(p["Variance"]))
+        start = format_date(p["Start_Date"])
+        finish = format_date(p["Finish_Date"])
+        percent = int(float(p["Percent_Complete"]))
+        parent = p.get("Parent_Task", "")
+
         # Determine if parent task (has children)
-        is_parent = any(proj.get('Parent_Task') == task_name for proj in projects)
-        
+        is_parent = any(proj.get("Parent_Task") == task_name for proj in projects)
+
         # Row classes
         row_class = "parent-task" if is_parent else ""
         task_class = "task-name subtask" if parent else "task-name"
-        
+
         # Variance styling
         if variance > 0:
             variance_class = "variance positive"
@@ -87,11 +87,11 @@ def generate_task_rows(projects):
         else:
             variance_class = "variance zero"
             variance_display = "0h"
-        
+
         # Progress bar styling
         progress_class = "progress-fill complete" if percent == 100 else "progress-fill"
-        
-        row = f'''
+
+        row = f"""
                     <tr class="{row_class}">
                         <td>{task_id}</td>
                         <td class="{task_class}">{task_name}</td>
@@ -107,69 +107,71 @@ def generate_task_rows(projects):
                                 <span class="progress-text">{percent}%</span>
                             </div>
                         </td>
-                    </tr>'''
+                    </tr>"""
         rows.append(row)
-    
-    return '\n'.join(rows)
+
+    return "\n".join(rows)
 
 
 def calculate_summary(projects):
     """Calculate summary statistics."""
-    total_hours = sum(float(p['Work_Hours']) for p in projects)
-    total_baseline = sum(float(p['Baseline_Hours']) for p in projects)
+    total_hours = sum(float(p["Work_Hours"]) for p in projects)
+    total_baseline = sum(float(p["Baseline_Hours"]) for p in projects)
     variance = total_hours - total_baseline
-    total_percent = sum(float(p['Percent_Complete']) for p in projects)
+    total_percent = sum(float(p["Percent_Complete"]) for p in projects)
     avg_percent = total_percent / len(projects) if projects else 0
-    
+
     # By resource
     by_resource = {}
     for p in projects:
-        resource = p['Resource']
+        resource = p["Resource"]
         if resource not in by_resource:
             by_resource[resource] = 0
-        by_resource[resource] += float(p['Work_Hours'])
-    
+        by_resource[resource] += float(p["Work_Hours"])
+
     return {
-        'total_tasks': len(projects),
-        'total_hours': total_hours,
-        'total_baseline': total_baseline,
-        'variance': variance,
-        'avg_percent': avg_percent,
-        'by_resource': by_resource
+        "total_tasks": len(projects),
+        "total_hours": total_hours,
+        "total_baseline": total_baseline,
+        "variance": variance,
+        "avg_percent": avg_percent,
+        "by_resource": by_resource,
     }
 
 
 def generate_legend(by_resource):
     """Generate resource legend HTML."""
     colors = {
-        'Chethan': '#e8f5e9',
-        'Umang': '#e3f2fd',
-        'Wasim': '#fff3e0',
-        'Mengmei': '#fce4ec',
-        'Steven': '#f3e5f5'
+        "Chethan": "#e8f5e9",
+        "Umang": "#e3f2fd",
+        "Wasim": "#fff3e0",
+        "Mengmei": "#fce4ec",
+        "Steven": "#f3e5f5",
     }
-    
+
     items = []
     for resource, hours in sorted(by_resource.items(), key=lambda x: -x[1]):
-        color = colors.get(resource, '#f5f5f5')
-        items.append(f'''
+        color = colors.get(resource, "#f5f5f5")
+        items.append(
+            f"""
             <div class="legend-item">
                 <div class="legend-color" style="background: {color};"></div>
                 <span>{resource} ({int(hours):,}h)</span>
-            </div>''')
-    
-    return '\n'.join(items)
+            </div>"""
+        )
+
+    return "\n".join(items)
 
 
 def generate_dashboard():
     """Generate the complete dashboard HTML."""
     projects = load_projects()
     summary = calculate_summary(projects)
-    
-    variance_class = "warning" if summary['variance'] > 0 else "success"
-    variance_sign = "+" if summary['variance'] > 0 else ""
-    
-    html = f'''<!DOCTYPE html>
+
+    variance_class = "warning" if summary["variance"] > 0 else "success"
+    variance_sign = "+" if summary["variance"] > 0 else ""
+
+    html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -543,32 +545,33 @@ def generate_dashboard():
         </div>
     </div>
 </body>
-</html>'''
-    
+</html>"""
+
     return html
 
 
 def main():
     # Generate dashboard
     html = generate_dashboard()
-    
+
     # Write to file
-    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write(html)
-    
+
     print(f"✅ Dashboard generated: {OUTPUT_FILE}")
-    
+
     # Open in browser if not in watch mode
-    if '--watch' not in sys.argv:
-        webbrowser.open(f'file:///{OUTPUT_FILE}')
+    if "--watch" not in sys.argv:
+        webbrowser.open(f"file:///{OUTPUT_FILE}")
         print("🌐 Opened in browser")
-    
+
     # Watch mode
-    if '--watch' in sys.argv:
+    if "--watch" in sys.argv:
         import time
+
         print("👀 Watching for changes... (Ctrl+C to stop)")
         last_modified = os.path.getmtime(PROJECTS_FILE)
-        
+
         while True:
             try:
                 time.sleep(1)
@@ -576,9 +579,11 @@ def main():
                 if current_modified != last_modified:
                     print(f"🔄 Change detected, regenerating...")
                     html = generate_dashboard()
-                    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
+                    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
                         f.write(html)
-                    print(f"✅ Dashboard updated: {datetime.now().strftime('%H:%M:%S')}")
+                    print(
+                        f"✅ Dashboard updated: {datetime.now().strftime('%H:%M:%S')}"
+                    )
                     last_modified = current_modified
             except KeyboardInterrupt:
                 print("\n👋 Stopped watching")

@@ -6,7 +6,7 @@ Changes sync back to projects.csv automatically.
 
 Usage:
     python dashboard_server.py
-    
+
 Then open: http://localhost:8080
 """
 
@@ -18,6 +18,8 @@ import webbrowser
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import parse_qs
+import urllib.request
+import urllib.error
 import threading
 
 # Configuration
@@ -27,11 +29,19 @@ PROJECTS_FILE = SCRIPT_DIR / "projects.csv"
 CHANGELOG_FILE = SCRIPT_DIR / "changelog.md"
 HOURS_PER_DAY = 8
 
+# Load environment variables
+if (SCRIPT_DIR / ".env").exists():
+    with open(SCRIPT_DIR / ".env", "r") as f:
+        for line in f:
+            if "=" in line and not line.strip().startswith("#"):
+                k, v = line.strip().split("=", 1)
+                os.environ[k] = v
+
 
 def load_projects():
     """Load projects from CSV."""
     projects = []
-    with open(PROJECTS_FILE, 'r', newline='', encoding='utf-8') as f:
+    with open(PROJECTS_FILE, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             projects.append(row)
@@ -43,7 +53,7 @@ def save_projects(projects):
     if not projects:
         return
     fieldnames = projects[0].keys()
-    with open(PROJECTS_FILE, 'w', newline='', encoding='utf-8') as f:
+    with open(PROJECTS_FILE, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(projects)
@@ -51,23 +61,23 @@ def save_projects(projects):
 
 def log_change(action, task, resource, details):
     """Append to changelog."""
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     entry = f"| {timestamp} | {action} | {task} | {resource} | {details} |\n"
-    
+
     if not os.path.exists(CHANGELOG_FILE):
-        with open(CHANGELOG_FILE, 'w', encoding='utf-8') as f:
+        with open(CHANGELOG_FILE, "w", encoding="utf-8") as f:
             f.write("# Project Changelog\n\n")
             f.write("| Timestamp | Action | Task | Resource | Details |\n")
             f.write("|-----------|--------|------|----------|--------|\n")
-    
-    with open(CHANGELOG_FILE, 'a', encoding='utf-8') as f:
+
+    with open(CHANGELOG_FILE, "a", encoding="utf-8") as f:
         f.write(entry)
 
 
 def recalculate_finish_date(start_date_str, total_hours):
     """Calculate finish date based on hours."""
     try:
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
         work_days = total_hours / HOURS_PER_DAY
         current_date = start_date
         days_added = 0
@@ -75,42 +85,151 @@ def recalculate_finish_date(start_date_str, total_hours):
             current_date += timedelta(days=1)
             if current_date.weekday() < 5:
                 days_added += 1
-        return current_date.strftime('%Y-%m-%d')
+        return current_date.strftime("%Y-%m-%d")
     except:
         return start_date_str
+
+
+def process_ai_request(query):
+    """Send query to LLM and get update instructions."""
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        return {"success": False, "message": "❌ API Key missing in .env"}
+
+    projects = load_projects()
+
+    # Context for the AI
+    context = "Current Project State (CSV):\nID,Task,Resource,Work_Hours,Percent_Complete,Finish_Date\n"
+    for p in projects:
+        context += f"{p['ID']},{p['Task']},{p['Resource']},{p['Work_Hours']},{p['Percent_Complete']},{p['Finish_Date']}\n"
+
+    system_prompt = f"""You are a Project Management AI Assistant.
+    You manage the following dataset:
+    {context}
+    
+    User Query: "{query}"
+    
+    YOUR GOAL:
+    Determine what changes to make to the CSV based on the query.
+    1. If the user wants to update data (e.g. "Add 5 hours to Build 2"), allow it. Calculate the NEW absolute value.
+    2. Return a JSON object with a "changes" list.
+    
+    Output Format (JSON ONLY):
+    {{
+        "reply": "Short text response to user",
+        "changes": [
+            {{ "id": "104", "field": "Work_Hours", "value": "1847" }},
+            {{ "id": "104", "field": "Finish_Date", "value": "2027-01-23" }}
+        ]
+    }}
+    
+    Valid fields: Task, Resource, Work_Hours, Start_Date, Finish_Date, Percent_Complete.
+    Calculate Finish_Date updates if Work_Hours changes (approx 8h/day).
+    Do not include markdown formatting.
+    """
+
+    try:
+        url = "https://models.inference.ai.azure.com/chat/completions"
+        payload = {
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant that outputs JSON.",
+                },
+                {"role": "user", "content": system_prompt},
+            ],
+            "model": "gpt-4o",
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"},
+        }
+
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}",
+            },
+        )
+
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode())
+            ai_content = result["choices"][0]["message"]["content"]
+            parsed = json.loads(ai_content)
+            return {"success": True, "data": parsed}
+
+    except Exception as e:
+        return {"success": False, "message": f"AI Error: {str(e)}"}
+
+
+def apply_ai_updates(changes):
+    """Apply list of changes from AI."""
+    projects = load_projects()
+    logs = []
+
+    for change in changes:
+        t_id = change["id"]
+        field = change["field"]
+        val = str(change["value"])
+
+        for p in projects:
+            if p["ID"] == str(t_id):
+                old = p.get(field, "?")
+                p[field] = val
+
+                # Recalc variance if needed
+                if field == "Work_Hours":
+                    try:
+                        p["Variance"] = str(
+                            int(float(val) - float(p["Baseline_Hours"]))
+                        )
+                    except:
+                        pass
+
+                logs.append(f"AI: {p['Task']} {field} {old}->{val}")
+                log_change(
+                    "AI_EDIT", p["Task"], p["Resource"], f"{field}: {old} -> {val}"
+                )
+
+    save_projects(projects)
+    return logs
 
 
 def generate_dashboard_html():
     """Generate the interactive dashboard HTML."""
     projects = load_projects()
-    
+
     # Calculate summary
-    total_hours = sum(float(p['Work_Hours']) for p in projects)
-    total_baseline = sum(float(p['Baseline_Hours']) for p in projects)
+    total_hours = sum(float(p["Work_Hours"]) for p in projects)
+    total_baseline = sum(float(p["Baseline_Hours"]) for p in projects)
     variance = total_hours - total_baseline
-    avg_percent = sum(float(p['Percent_Complete']) for p in projects) / len(projects) if projects else 0
-    
+    avg_percent = (
+        sum(float(p["Percent_Complete"]) for p in projects) / len(projects)
+        if projects
+        else 0
+    )
+
     variance_class = "warning" if variance > 0 else "success"
     variance_sign = "+" if variance > 0 else ""
-    
+
     # Generate table rows
     rows_html = ""
     for p in projects:
-        task_id = p['ID']
-        task_name = p['Task']
-        resource = p['Resource']
-        work = int(float(p['Work_Hours']))
-        baseline = int(float(p['Baseline_Hours']))
-        var = int(float(p['Variance']))
-        start = p['Start_Date']
-        finish = p['Finish_Date']
-        percent = int(float(p['Percent_Complete']))
-        parent = p.get('Parent_Task', '')
-        
-        is_parent = any(proj.get('Parent_Task') == task_name for proj in projects)
+        task_id = p["ID"]
+        task_name = p["Task"]
+        resource = p["Resource"]
+        work = int(float(p["Work_Hours"]))
+        baseline = int(float(p["Baseline_Hours"]))
+        var = int(float(p["Variance"]))
+        start = p["Start_Date"]
+        finish = p["Finish_Date"]
+        percent = int(float(p["Percent_Complete"]))
+        parent = p.get("Parent_Task", "")
+
+        is_parent = any(proj.get("Parent_Task") == task_name for proj in projects)
         row_class = "parent-task" if is_parent else ""
         task_class = "task-name subtask" if parent else "task-name"
-        
+
         if var > 0:
             var_class = "variance positive"
             var_display = f"+{var}"
@@ -120,8 +239,8 @@ def generate_dashboard_html():
         else:
             var_class = "variance zero"
             var_display = "0"
-        
-        rows_html += f'''
+
+        rows_html += f"""
                     <tr class="{row_class}" data-id="{task_id}">
                         <td>{task_id}</td>
                         <td class="{task_class}">{task_name}</td>
@@ -146,9 +265,9 @@ def generate_dashboard_html():
                                 <span class="progress-value">{percent}%</span>
                             </div>
                         </td>
-                    </tr>'''
-    
-    html = f'''<!DOCTYPE html>
+                    </tr>"""
+
+    html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -451,6 +570,69 @@ def generate_dashboard_html():
         }}
         
         .help-text strong {{ color: #2c3e50; }}
+
+        /* Chat Widget */
+        .chat-widget {{
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 350px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #ddd;
+            z-index: 1000;
+        }}
+        .chat-header {{
+            background: #2c3e50;
+            color: white;
+            padding: 10px 15px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        .chat-messages {{
+            height: 300px;
+            padding: 15px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }}
+        .message {{
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            max-width: 85%;
+        }}
+        .message.user {{
+            background: #3498db;
+            color: white;
+            align-self: flex-end;
+        }}
+        .message.bot {{
+            background: #e9ecef;
+            color: #333;
+            align-self: flex-start;
+        }}
+        .chat-input-area {{
+            padding: 10px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            gap: 5px;
+        }}
+        .chat-input {{
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            outline: none;
+        }}
     </style>
 </head>
 <body>
@@ -540,6 +722,19 @@ def generate_dashboard_html():
                 <span style="color: #27ae60; font-weight: 600;">-Green</span>
                 <span>= Under budget</span>
             </div>
+        </div>
+    </div>
+    
+    <div class="chat-widget">
+        <div class="chat-header">
+            <span>🤖 AI Copilot</span>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <div class="message bot">Hello! I can help you update tasks. Try "Add 10 hours to Build 2".</div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" class="chat-input" id="chat-input" placeholder="Type instructions...">
+            <button class="btn-primary" onclick="sendMessage()">Send</button>
         </div>
     </div>
     
@@ -645,10 +840,61 @@ def generate_dashboard_html():
                 saveChange(id, field, this.value);
             }});
         }});
+
+        // Chat Logic
+        async function sendMessage() {{
+            const input = document.getElementById('chat-input');
+            const msg = input.value.trim();
+            if (!msg) return;
+            
+            addMessage(msg, 'user');
+            input.value = '';
+            
+            const loadingId = addMessage('Thinking...', 'bot');
+            
+            try {{
+                const response = await fetch('/chat', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ query: msg }})
+                }});
+                
+                const data = await response.json();
+                document.getElementById(loadingId).remove();
+                
+                if (data.success) {{
+                    addMessage(data.reply, 'bot');
+                    if (data.changes_count > 0) {{
+                        showStatus(`✨ ${{data.changes_count}} changes applied!`, 'success');
+                        setTimeout(() => location.reload(), 1500);
+                    }}
+                }} else {{
+                    addMessage('❌ ' + (data.message || 'Error'), 'bot');
+                }}
+            }} catch (err) {{
+                if (document.getElementById(loadingId)) document.getElementById(loadingId).remove();
+                addMessage('❌ Connection failed', 'bot');
+            }}
+        }}
+
+        function addMessage(text, role) {{
+            const div = document.createElement('div');
+            div.className = `message ${{role}}`;
+            div.textContent = text;
+            div.id = 'msg-' + Date.now();
+            const container = document.getElementById('chat-messages');
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+            return div.id;
+        }}
+
+        document.getElementById('chat-input').addEventListener('keypress', function(e) {{
+            if (e.key === 'Enter') sendMessage();
+        }});
     </script>
 </body>
-</html>'''
-    
+</html>"""
+
     return html
 
 
@@ -657,37 +903,39 @@ def generate_changelog_html():
     if not os.path.exists(CHANGELOG_FILE):
         content = "No changes recorded yet."
     else:
-        with open(CHANGELOG_FILE, 'r', encoding='utf-8') as f:
+        with open(CHANGELOG_FILE, "r", encoding="utf-8") as f:
             content = f.read()
-    
+
     # Convert markdown table to HTML
-    lines = content.split('\n')
+    lines = content.split("\n")
     html_content = ""
     in_table = False
-    
+
     for line in lines:
-        if line.startswith('|'):
+        if line.startswith("|"):
             if not in_table:
                 html_content += '<table class="changelog-table">'
                 in_table = True
-            
-            if '---' in line:
+
+            if "---" in line:
                 continue
-            
-            cells = [c.strip() for c in line.split('|')[1:-1]]
-            tag = 'th' if 'Timestamp' in line else 'td'
-            html_content += '<tr>' + ''.join(f'<{tag}>{c}</{tag}>' for c in cells) + '</tr>'
+
+            cells = [c.strip() for c in line.split("|")[1:-1]]
+            tag = "th" if "Timestamp" in line else "td"
+            html_content += (
+                "<tr>" + "".join(f"<{tag}>{c}</{tag}>" for c in cells) + "</tr>"
+            )
         else:
             if in_table:
-                html_content += '</table>'
+                html_content += "</table>"
                 in_table = False
-            if line.startswith('#'):
+            if line.startswith("#"):
                 html_content += f'<h2>{line.replace("#", "").strip()}</h2>'
-    
+
     if in_table:
-        html_content += '</table>'
-    
-    return f'''<!DOCTYPE html>
+        html_content += "</table>"
+
+    return f"""<!DOCTYPE html>
 <html>
 <head>
     <title>Changelog</title>
@@ -703,95 +951,135 @@ def generate_changelog_html():
 <body>
     {html_content}
 </body>
-</html>'''
+</html>"""
 
 
 class DashboardHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass  # Suppress default logging
-    
+
     def do_GET(self):
-        if self.path == '/' or self.path == '/dashboard':
+        if self.path == "/" or self.path == "/dashboard":
             self.send_response(200)
-            self.send_header('Content-type', 'text/html')
+            self.send_header("Content-type", "text/html")
             self.end_headers()
             self.wfile.write(generate_dashboard_html().encode())
-        
-        elif self.path == '/changelog':
+
+        elif self.path == "/changelog":
             self.send_response(200)
-            self.send_header('Content-type', 'text/html')
+            self.send_header("Content-type", "text/html")
             self.end_headers()
             self.wfile.write(generate_changelog_html().encode())
-        
+
         else:
             self.send_error(404)
-    
+
     def do_POST(self):
-        if self.path == '/update':
-            content_length = int(self.headers['Content-Length'])
+        if self.path == "/chat":
+            content_length = int(self.headers["Content-Length"])
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data.decode())
-            
-            task_id = data['id']
-            field = data['field']
-            value = data['value']
-            
+            query = data.get("query", "")
+
+            result = process_ai_request(query)
+
+            response = {}
+            if result["success"]:
+                ai_data = result["data"]
+                changes = ai_data.get("changes", [])
+                reply = ai_data.get("reply", "Done.")
+
+                logs = []
+                if changes:
+                    logs = apply_ai_updates(changes)
+
+                response = {
+                    "success": True,
+                    "reply": reply,
+                    "logs": logs,
+                    "changes_count": len(changes),
+                }
+            else:
+                response = result  # Propagate error
+
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(response).encode())
+
+        elif self.path == "/update":
+            content_length = int(self.headers["Content-Length"])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode())
+
+            task_id = data["id"]
+            field = data["field"]
+            value = data["value"]
+
             # Load and update projects
             projects = load_projects()
             task = None
-            
+
             for p in projects:
-                if p['ID'] == str(task_id):
+                if p["ID"] == str(task_id):
                     task = p
-                    old_value = p.get(field, '')
+                    old_value = p.get(field, "")
                     p[field] = str(value)
-                    
+
                     # Recalculate variance if work hours changed
-                    if field == 'Work_Hours':
+                    if field == "Work_Hours":
                         work = float(value)
-                        baseline = float(p['Baseline_Hours'])
-                        p['Variance'] = str(int(work - baseline))
-                        
+                        baseline = float(p["Baseline_Hours"])
+                        p["Variance"] = str(int(work - baseline))
+
                         # Recalculate finish date
-                        new_finish = recalculate_finish_date(p['Start_Date'], work)
-                        p['Finish_Date'] = new_finish
-                    
+                        new_finish = recalculate_finish_date(p["Start_Date"], work)
+                        p["Finish_Date"] = new_finish
+
                     break
-            
+
             if task:
                 save_projects(projects)
-                log_change('EDIT', task['Task'], task['Resource'], f"{field}: {old_value} → {value}")
-                
+                log_change(
+                    "EDIT",
+                    task["Task"],
+                    task["Resource"],
+                    f"{field}: {old_value} → {value}",
+                )
+
                 # Calculate new summary
-                total_hours = sum(float(p['Work_Hours']) for p in projects)
-                total_baseline = sum(float(p['Baseline_Hours']) for p in projects)
+                total_hours = sum(float(p["Work_Hours"]) for p in projects)
+                total_baseline = sum(float(p["Baseline_Hours"]) for p in projects)
                 variance = total_hours - total_baseline
-                avg_percent = sum(float(p['Percent_Complete']) for p in projects) / len(projects)
-                
+                avg_percent = sum(float(p["Percent_Complete"]) for p in projects) / len(
+                    projects
+                )
+
                 response = {
-                    'success': True,
-                    'message': f"{task['Task']} updated",
-                    'new_variance': int(float(task['Variance'])),
-                    'new_finish': task.get('Finish_Date'),
-                    'summary': {
-                        'total_hours': int(total_hours),
-                        'variance': int(variance),
-                        'avg_percent': avg_percent
-                    }
+                    "success": True,
+                    "message": f"{task['Task']} updated",
+                    "new_variance": int(float(task["Variance"])),
+                    "new_finish": task.get("Finish_Date"),
+                    "summary": {
+                        "total_hours": int(total_hours),
+                        "variance": int(variance),
+                        "avg_percent": avg_percent,
+                    },
                 }
             else:
-                response = {'success': False, 'message': 'Task not found'}
-            
+                response = {"success": False, "message": "Task not found"}
+
             self.send_response(200)
-            self.send_header('Content-type', 'application/json')
+            self.send_header("Content-type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(response).encode())
 
 
 def main():
-    server = HTTPServer(('localhost', PORT), DashboardHandler)
-    
-    print(f"""
+    server = HTTPServer(("localhost", PORT), DashboardHandler)
+
+    print(
+        f"""
 ╔══════════════════════════════════════════════════════════════╗
 ║  🚀 KPI Dashboard Server Running                             ║
 ║                                                              ║
@@ -805,14 +1093,15 @@ def main():
 ║                                                              ║
 ║  Press Ctrl+C to stop                                        ║
 ╚══════════════════════════════════════════════════════════════╝
-""")
-    
+"""
+    )
+
     # Open browser after short delay
     def open_browser():
-        webbrowser.open(f'http://localhost:{PORT}')
-    
+        webbrowser.open(f"http://localhost:{PORT}")
+
     threading.Timer(1.0, open_browser).start()
-    
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:

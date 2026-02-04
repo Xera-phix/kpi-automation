@@ -11,10 +11,10 @@ ID,Task,Resource,Work_Hours,Baseline_Hours,Variance,Start_Date,Finish_Date,Perce
 112,Fault Monitoring Reporting B2,Umang,372,342,30,2025-09-15,2025-12-04,11,Fixed Duration,
 113,Fault Code Reporting SwDF,Wasim,222,310,-88,2025-09-15,2025-10-22,0,Fixed Work,Fault Monitoring Reporting B2
 114,Fault Code Reporting Implementation,Wasim,150,120,30,2025-10-22,2025-12-04,28,Fixed Work,Fault Monitoring Reporting B2
-115,Bug Fixes from B1,Chethan,448,327,121,2025-09-01,2025-12-26,33,Fixed Duration,
+115,Bug Fixes from B1,Unassigned,0,327,-327,2025-09-01,2025-12-29,0,Fixed Duration,
 116,SCS for Bug Fixes,Chethan,0,40,-40,2025-09-01,2025-09-01,0,Fixed Work,Bug Fixes from B1
-120,CCP00559148 EBRC slave checkback supervision,Mengmei,40,40,0,2025-11-25,2025-12-15,60,Fixed Work,Bug Fixes from B1
-121,CCP00555604 Fix Compilation Issue,Mengmei,40,40,0,2025-12-01,2025-12-22,0,Fixed Work,Bug Fixes from B1
-122,CCP00558513 ETS Set/Clear Not Reported,Mengmei,40,40,0,2025-12-08,2025-12-12,60,Fixed Work,Bug Fixes from B1
+120,CCP00559148 EBRC slave checkback supervision,Unassigned,0,40,-40,2025-11-25,2025-12-15,60,Fixed Work,Bug Fixes from B1
+121,CCP00555604 Fix Compilation Issue,Unassigned,0,40,-40,2025-12-01,2025-12-22,0,Fixed Work,Bug Fixes from B1
+122,CCP00558513 ETS Set/Clear Not Reported,Unassigned,0,40,-40,2025-12-08,2025-12-12,60,Fixed Work,Bug Fixes from B1
 123,CCP00555244 Train Halt if Loss of Comm,Chethan,40,40,0,2025-12-01,2025-12-05,20,Fixed Work,Bug Fixes from B1
 124,CCP00558515 SuRS.32791 conflicting failure conditions,Steven,8,8,0,2025-09-01,2025-09-02,100,Fixed Work,Bug Fixes from B1
