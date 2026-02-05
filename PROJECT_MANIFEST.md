@@ -2,82 +2,211 @@
 
 This document serves as a comprehensive knowledge base for the KPI Automation project. It details the project's history, architecture, current status, and strategic goals to ensure continuity across different devices and AI sessions.
 
+---
+
 ## 1. Project Overview
-**Goal:** Create a lightweight, "Minimum Viable Product" (MVP) project tracking dashboard that replaces complex tools like MS Project.
+
+**Goal:** Create a project tracking dashboard that replaces complex tools like MS Project, with AI-powered natural language updates.
+
 **Core Philosophy:**
-- **"Talk to the Code":** The user prefers interacting via natural language prompts (VS Code Copilot) to modify data rather than clicking through heavy GUIs.
-- **Simplicity:** No heavy frameworks (Django/Flask/React) unless necessary. Uses Python standard libraries where possible.
-- **Portability:** Everything runs locally. Data is stored in plain CSV.
-- **Aesthetics:** A "Modern," clean, dark-themed dashboard is preferred over raw data tables.
+- **"Talk to the Data":** Users interact via natural language prompts to modify data (e.g., "Add 20 hours to Build 2").
+- **Modern Stack:** FastAPI backend + React frontend + SQLite database.
+- **Real-time Updates:** No full page reloads; only affected cells update.
+- **Local-First:** Everything runs locally, with option to deploy later.
 
-## 2. Architecture
+---
 
-### Data Layer (Source of Truth)
-- **File:** `projects.csv`
-- **Schema:** 
-  - `ID`: Unique identifier.
-  - `Task`, `Resource`: Descriptive fields.
-  - `Work_Hours`, `Baseline_Hours`, `Variance`: Quantitative metrics.
-  - `Start_Date`, `Finish_Date`: ISO 8601 dates (YYYY-MM-DD).
-  - `Percent_Complete`: Integer (0-100).
-  - `type` / `Parent_Task`: Metadata for grouping (though currently flat-listed in UI).
+## 2. Architecture (v2.0)
 
-### Application Logic (Python)
-- **`dashboard_server.py` (The Core):**
-  - Runs a local `http.server` on port 8080.
-  - **GET**: Serves the interactive "Modern" HTML dashboard with live data from CSV.
-  - **POST**: Handles JSON payloads to update specific cells (inline editing) or rows. Auto-calculates variances.
-  - **Logging**: Appends all changes to `changelog.md` for audit trails.
-- **`update_project.py`:**
-  - CLI utility for programmatic updates (e.g., used by Copilot to "add 5 hours to task X").
-  - Handles date recalculations and business logic.
-- **`generate_dashboard.py`:**
-  - Generates a static read-only HTML file (`dashboard.html`) for offline viewing.
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              ARCHITECTURE v2.0                               │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-### Frontend (Presentation)
-- **Technology:** Vanilla HTML5, CSS3, JavaScript (embedded in Python scripts for portability).
-- **Style:** Dark mode, card-based layout for summary stats, interactive grid for task list.
+  BROWSER (React)              BACKEND (FastAPI)              DATABASE (SQLite)
+        │                            │                              │
+        │  GET /api/tasks            │                              │
+        ├───────────────────────────►│  SELECT * FROM tasks         │
+        │                            ├─────────────────────────────►│
+        │  JSON [{task}, ...]        │◄─────────────────────────────┤
+        │◄───────────────────────────┤                              │
+        │                            │                              │
+        │  PATCH /api/tasks/104      │                              │
+        │  {work_hours: 1862}        │  UPDATE tasks SET...         │
+        ├───────────────────────────►├─────────────────────────────►│
+        │                            │                              │
+        │  setState(tasks[104])      │  (Partial update only)       │
+        │  ← Only row 104 re-renders │                              │
+        │                            │                              │
+        │  POST /api/chat            │                              │
+        │  {query: "Add 20h..."}     │  → LLM API → Parse JSON      │
+        ├───────────────────────────►│  → UPDATE multiple rows      │
+        │                            ├─────────────────────────────►│
+        │  {reply, changes_count}    │                              │
+        │◄───────────────────────────┤                              │
+```
+
+### Data Layer
+- **Database:** `kpi_data.db` (SQLite)
+- **Schema:**
+  - `tasks` table: id, task, resource, work_hours, baseline_hours, variance (computed), start_date, finish_date, percent_complete, task_type, parent_task
+  - `changelog` table: timestamp, action, task_name, resource, details
+  - `resources` table: name, available_hours_per_day, is_active
+- **Migration:** Original `projects.csv` is auto-migrated on first startup.
+
+### Backend (Python/FastAPI)
+- **Location:** `backend/`
+- **Files:**
+  - `main.py` - FastAPI application with REST endpoints
+  - `database.py` - SQLite operations, CRUD, S-curve calculations
+  - `ai_service.py` - LLM integration (GitHub Models API)
+  - `requirements.txt` - Python dependencies
+- **Endpoints:**
+  - `GET /api/tasks` - List all tasks
+  - `PATCH /api/tasks/{id}` - Update a task
+  - `GET /api/summary` - Aggregated stats
+  - `GET /api/scurve` - S-curve chart data
+  - `POST /api/chat` - AI natural language interface
+
+### Frontend (React/Vite)
+- **Location:** `frontend/`
+- **Files:**
+  - `src/App.jsx` - Main React component
+  - `src/index.css` - Styles
+  - `package.json` - Node dependencies
+  - `vite.config.js` - Dev server with API proxy
 - **Features:**
-  - Inline editing of cells.
-  - Progress bars.
-  - "Save" buttons that trigger AJAX POST requests to the Python server.
+  - Inline editable cells (work hours, dates)
+  - Progress sliders
+  - Resource dropdowns
+  - S-Curve chart (Chart.js)
+  - AI Chat widget
 
-## 3. Current Status & Capabilities
-- **Status:** **Stable / MVP Complete**.
-- **Version Control:** Repository initialized and pushed to GitHub (`https://github.com/Xera-phix/kpi-automation`). 
-- **Key Features:**
-  - ✅ **Visualization:** Modern dashboard renders CSV data correctly.
-  - ✅ **Interactivity:** Users can edit rows directly in the browser; changes persist to CSV.
-  - ✅ **AI Chat Assistant:** Integrated "Talk to Data" feature using LLM API. Users can type requests like "Add 5 hours to Build 2" directly in the dashboard.
-  - ✅ **Audit:** All changes are logged in `changelog.md`.
-  - ✅ **AI workflow:** The system is optimized for an AI agent to read `projects.csv` and make updates via `update_project.py` upon user request.
+---
 
-## 4. Conversation History & User Intent
+## 3. Current Status
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| SQLite Database | ✅ Complete | Auto-migration from CSV, phase columns |
+| FastAPI Backend | ✅ Complete | REST API + AI endpoint + confirm actions |
+| React Frontend | ✅ Complete | Table, chat, charts, confirmation UI |
+| AI Integration | ✅ Complete | GitHub Models (gpt-4o) with multi-turn |
+| Phase-Aware AI | ✅ Complete | Detects dev/test/review queries, asks clarification |
+| Legacy (dashboard_server.py) | ⚠️ Deprecated | Still works, but use new stack |
+
+---
+
+## 3.1. Phase-Aware AI Feature
+
+The AI now supports **multi-turn conversations** for phase-specific adjustments:
+
+**Example Flow:**
+```
+User: "Build 2 development is taking 20 hours longer"
+
+AI: 📋 Build 2 Development needs +20h. How should I adjust?
+    [1] Add 20h to Development only (Dev: 0h → 20h | Total: 1862h → 1882h)
+    [2] Scale all phases by +1.1% (Dev: 20.2h | Test: 0h | Review: 0h)
+    [3] Cancel
+
+User clicks option 1 → Changes applied
+```
+
+**Database Schema (new columns):**
+- `dev_hours`, `test_hours`, `review_hours` - Phase breakdown
+- `hours_completed`, `hours_remaining`, `earned_value` - Calculated fields
+- `pending_actions` table - Stores options until user confirms
+- `lead_preferences` table - Per-resource default behavior
+
+---
+
+## 4. Quick Start
+
+### Backend
+```powershell
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+### Frontend
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Then open: **http://localhost:5173**
+
+---
+
+## 5. User Intent & History
+
 **Evolution:**
-1.  **Initial Request:** Wanted an MVP KPI tracker. Considered Streamlit vs. VS Code.
-2.  **Pivot:** Decided on VS Code + Copilot. "I just want to talk to you aka my copilot" to manage the project.
-3.  **UI Iteration:** The initial CLI output was too raw ("ugly"). We iterated through 3 designs (Simple, Corporate, Modern). The user selected **"Modern"**.
-4.  **Feature Add:** Added manual editing capabilities to the dashboard.
-5.  **Deployment:** Code pushed to GitHub for syncing across devices.
+1. **MVP Request:** Started with Python `http.server` + CSV + embedded HTML
+2. **UI Iteration:** Moved from raw tables → "Modern" dark-themed dashboard
+3. **AI Chat:** Added natural language interface for updates
+4. **Stack Upgrade:** Migrated to FastAPI + SQLite + React for maintainability
 
-## 5. Instructions for Future AI Agents
-When working on this workspace:
-1.  **Data Integrity:** Always treat `projects.csv` as the database. Do not manually edit it if possible; use `update_project.py` or the server logic to ensure consistency.
-2.  **Server Management:** The user runs the dashboard via `python dashboard_server.py`. If they ask to "see" the data, check if the server is running or read the CSV.
-3.  **Modifications:**
-    - If UI changes are needed, edit the HTML string inside `dashboard_server.py`.
-    - If Logic changes are needed (e.g., new columns), update `projects.csv` header AND the CSV handling logic in python scripts.
-4.  **Commit Protocol:** The user likes to keep things synced. Remind them to push changes to GitHub after significant updates.
+**Future Goals (User Brainstorm):**
+- Task phases (Development, Testing, Review) with % splits
+- Resource availability tracking (e.g., "Umang is away for 2 months")
+- Auto-adjust S-curve on changes
+- Gantt chart visualization
+- Tailorable preferences per lead
 
-## 6. Directory Structure
+---
+
+## 6. Instructions for Future AI Agents
+
+1. **Database:** Use SQLite (`kpi_data.db`) via `backend/database.py`. Do NOT manually edit the file.
+2. **API First:** All data changes should go through FastAPI endpoints.
+3. **Frontend Dev:** Edit `frontend/src/App.jsx` for UI changes. Use `npm run dev` for hot reload.
+4. **AI Logic:** Modify prompts in `backend/ai_service.py` to add new capabilities.
+5. **Legacy:** The old `dashboard_server.py` still works but is deprecated.
+
+---
+
+## 7. Directory Structure (v2.0)
+
 ```
 /
-├── .git/                 # Git metadata
-├── .gitignore            # Ignored files (pycache, etc.)
-├── changelog.md          # Audit log of changes
-├── dashboard_server.py   # MAIN APP: Web server + UI
-├── projects.csv          # MAIN DATA
-├── update_project.py     # CLI Logic for AI updates
-├── generate_dashboard.py # Static generator (legacy/backup)
-└── views/                # Mockups (reference only)
+├── backend/                  # FastAPI backend
+│   ├── main.py               # API endpoints
+│   ├── database.py           # SQLite operations
+│   ├── ai_service.py         # LLM integration
+│   └── requirements.txt      # Python deps
+│
+├── frontend/                 # React frontend
+│   ├── src/
+│   │   ├── App.jsx           # Main component
+│   │   ├── index.css         # Styles
+│   │   └── main.jsx          # Entry point
+│   ├── package.json          # Node deps
+│   └── vite.config.js        # Vite config
+│
+├── kpi_data.db               # SQLite database (generated)
+├── projects.csv              # Legacy data (for migration)
+├── .env                      # API keys (gitignored)
+├── changelog.md              # Audit log
+├── PROJECT_MANIFEST.md       # This file
+│
+└── [Legacy - Deprecated]
+    ├── dashboard_server.py   # Old monolithic server
+    ├── update_project.py     # Old CLI tool
+    └── generate_dashboard.py # Old static generator
 ```
+
+---
+
+## 8. Tech Stack Comparison
+
+| Aspect | Old (v1) | New (v2) |
+|--------|----------|----------|
+| Backend | `http.server` | FastAPI |
+| Database | CSV file | SQLite |
+| Frontend | Embedded HTML strings | React + Vite |
+| Updates | Full page reload | Partial re-render |
+| Concurrency | File locking issues | SQLite transactions |
+| Maintainability | Hard (1100 lines) | Modular files |

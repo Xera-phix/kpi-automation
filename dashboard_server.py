@@ -99,9 +99,9 @@ def process_ai_request(query):
     projects = load_projects()
 
     # Context for the AI
-    context = "Current Project State (CSV):\nID,Task,Resource,Work_Hours,Percent_Complete,Finish_Date\n"
+    context = "Current Project State (CSV):\\nID,Task,Resource,Work_Hours,Start_Date,Finish_Date,Parent_Task\\n"
     for p in projects:
-        context += f"{p['ID']},{p['Task']},{p['Resource']},{p['Work_Hours']},{p['Percent_Complete']},{p['Finish_Date']}\n"
+        context += f"{p['ID']},{p['Task']},{p['Resource']},{p['Work_Hours']},{p['Start_Date']},{p['Finish_Date']},{p['Parent_Task']}\\n"
 
     system_prompt = f"""You are a Project Management AI Assistant.
     You manage the following dataset:
@@ -111,15 +111,15 @@ def process_ai_request(query):
     
     YOUR GOAL:
     Determine what changes to make to the CSV based on the query.
-    1. If the user wants to update data (e.g. "Add 5 hours to Build 2"), allow it. Calculate the NEW absolute value.
-    2. Return a JSON object with a "changes" list.
+    
+    ADVANCED CAPABILITIES:
+    1. **Resource Adjustment**: If user says "Resource A is away" or "Reassign Resource A", find ALL tasks for that resource and update "Resource" field or shift "Start_Date"/"Finish_Date".
+    2. **Dependencies**: If a task duration changes, look for its Parent_Task or any implied dependencies and suggest updates to them too if needed (though mostly update the specific task).
+    3. **Specific Case**: If user says "Task X takes 20 hours longer", ADD 20 to the current Work_Hours.
     
     Output Format (JSON ONLY):
     {{
-        "reply": "Short text response to user",
-        "changes": [
-            {{ "id": "104", "field": "Work_Hours", "value": "1847" }},
-            {{ "id": "104", "field": "Finish_Date", "value": "2027-01-23" }}
+        "reply": "Concise summary of what you did (e.g. 'Added 20h to Task X and shifted dates').",
         ]
     }}
     
@@ -195,9 +195,82 @@ def apply_ai_updates(changes):
     return logs
 
 
+def get_scurve_data(projects):
+    """Calculate S-Curve data points."""
+    if not projects:
+        return {"labels": [], "baseline": [], "actual": []}
+
+    # Find range
+    dates = []
+    for p in projects:
+        try:
+            dates.append(datetime.strptime(p["Start_Date"], "%Y-%m-%d"))
+            dates.append(datetime.strptime(p["Finish_Date"], "%Y-%m-%d"))
+        except:
+            pass
+
+    if not dates:
+        return {"labels": [], "baseline": [], "actual": []}
+
+    min_date = min(dates)
+    max_date = max(dates)
+
+    # Create timeline
+    timeline = {}
+    current = min_date
+    while current <= max_date:
+        d_str = current.strftime("%Y-%m-%d")
+        timeline[d_str] = {"baseline": 0, "actual": 0}
+        current += timedelta(days=1)
+
+    # Fill daily buckets
+    for p in projects:
+        try:
+            start = datetime.strptime(p["Start_Date"], "%Y-%m-%d")
+            finish = datetime.strptime(p["Finish_Date"], "%Y-%m-%d")
+
+            baseline_total = float(p.get("Baseline_Hours", 0))
+            actual_total = float(p.get("Work_Hours", 0))
+
+            # Simple linear distribution (excluding weekends could be added here)
+            duration = (finish - start).days + 1
+            if duration < 1:
+                duration = 1
+
+            daily_baseline = baseline_total / duration
+            daily_actual = actual_total / duration
+
+            curr = start
+            while curr <= finish:
+                d_str = curr.strftime("%Y-%m-%d")
+                if d_str in timeline:
+                    timeline[d_str]["baseline"] += daily_baseline
+                    timeline[d_str]["actual"] += daily_actual
+                curr += timedelta(days=1)
+        except:
+            continue
+
+    # Accumulate
+    labels = sorted(timeline.keys())
+    baseline_data = []
+    actual_data = []
+
+    cum_b = 0
+    cum_a = 0
+
+    for date in labels:
+        cum_b += timeline[date]["baseline"]
+        cum_a += timeline[date]["actual"]
+        baseline_data.append(round(cum_b, 1))
+        actual_data.append(round(cum_a, 1))
+
+    return {"labels": labels, "baseline": baseline_data, "actual": actual_data}
+
+
 def generate_dashboard_html():
     """Generate the interactive dashboard HTML."""
     projects = load_projects()
+    scurve_data = get_scurve_data(projects)
 
     # Calculate summary
     total_hours = sum(float(p["Work_Hours"]) for p in projects)
@@ -273,6 +346,7 @@ def generate_dashboard_html():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KPI Project Tracker - Interactive Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {{
             margin: 0;
@@ -312,8 +386,15 @@ def generate_dashboard_html():
             display: flex;
             gap: 40px;
             border-bottom: 1px solid #ddd;
+            align-items: center;
         }}
         
+        .chart-container {
+            flex: 1;
+            height: 100px;
+            max-width: 400px;
+        }
+
         .metric {{
             text-align: center;
         }}
@@ -667,6 +748,9 @@ def generate_dashboard_html():
             <div class="metric-value" id="avg-percent">{int(avg_percent)}%</div>
             <div class="metric-label">Avg Complete</div>
         </div>
+        <div class="chart-container">
+            <canvas id="scurveChart"></canvas>
+        </div>
     </div>
     
     <div class="container">
@@ -739,6 +823,49 @@ def generate_dashboard_html():
     </div>
     
     <script>
+        // Initialize Chart
+        const ctx = document.getElementById('scurveChart').getContext('2d');
+        const scurveData = {json.dumps(scurve_data)};
+        
+        new Chart(ctx, {{
+            type: 'line',
+            data: {{
+                labels: scurveData.labels,
+                datasets: [
+                    {{
+                        label: 'Baseline (Planned)',
+                        data: scurveData.baseline,
+                        borderColor: '#95a5a6',
+                        borderDash: [5, 5],
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false
+                    }},
+                    {{
+                        label: 'Actual (Forecast)',
+                        data: scurveData.actual,
+                        borderColor: '#3498db',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        fill: true
+                    }}
+                ]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {{
+                    legend: {{ display: false }},
+                    tooltip: {{ mode: 'index', intersect: false }}
+                }},
+                scales: {{
+                    x: {{ display: false }},
+                    y: {{ display: false }}
+                }}
+            }}
+        }});
+
         // Show status message
         function showStatus(message, type) {{
             const el = document.getElementById('status-message');
