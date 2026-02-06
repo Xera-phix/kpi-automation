@@ -33,21 +33,24 @@ function App() {
   const [selectedProject, setSelectedProject] = useState(null)  // For project S-curve
   const [projectScurve, setProjectScurve] = useState(null)  // Project-specific S-curve data
   const [showCharts, setShowCharts] = useState(true)  // Toggle charts panel
+  const [resourceAllocation, setResourceAllocation] = useState([])  // Resource allocation data
   const chatRef = useRef(null)
 
   // Fetch all data
   const fetchData = async () => {
     try {
-      const [tasksRes, summaryRes, scurveRes, resourcesRes] = await Promise.all([
+      const [tasksRes, summaryRes, scurveRes, resourcesRes, allocRes] = await Promise.all([
         fetch(`${API_BASE}/tasks`),
         fetch(`${API_BASE}/summary`),
         fetch(`${API_BASE}/scurve`),
-        fetch(`${API_BASE}/resources`)
+        fetch(`${API_BASE}/resources`),
+        fetch(`${API_BASE}/resource-allocation`)
       ])
       setTasks(await tasksRes.json())
       setSummary(await summaryRes.json())
       setScurveData(await scurveRes.json())
       setResources(await resourcesRes.json())
+      setResourceAllocation(await allocRes.json())
     } catch (err) {
       showToast('Failed to load data', 'error')
     }
@@ -238,27 +241,26 @@ function App() {
     interaction: { mode: 'nearest', axis: 'x', intersect: false }
   }
 
-  // Resource workload bar chart
-  const resourceWorkload = resources.map(r => {
-    const resourceTasks = tasks.filter(t => t.resource === r.name)
-    const totalHours = resourceTasks.reduce((sum, t) => sum + (t.hours_remaining || 0), 0)
-    const completedHours = resourceTasks.reduce((sum, t) => sum + (t.hours_completed || 0), 0)
-    return { name: r.name, remaining: totalHours, completed: completedHours }
-  }).filter(r => r.remaining > 0 || r.completed > 0)
-
+  // Resource workload bar chart - MS Project style (Capacity vs Allocation)
   const resourceChartData = {
-    labels: resourceWorkload.map(r => r.name),
+    labels: resourceAllocation.map(r => r.name),
     datasets: [
       {
         label: 'Completed',
-        data: resourceWorkload.map(r => r.completed),
+        data: resourceAllocation.map(r => r.completed),
         backgroundColor: '#10b981',
         borderRadius: 4
       },
       {
         label: 'Remaining',
-        data: resourceWorkload.map(r => r.remaining),
+        data: resourceAllocation.map(r => r.remaining),
         backgroundColor: '#3b82f6',
+        borderRadius: 4
+      },
+      {
+        label: 'Available',
+        data: resourceAllocation.map(r => r.available),
+        backgroundColor: 'rgba(156, 163, 175, 0.3)',
         borderRadius: 4
       }
     ]
@@ -268,9 +270,27 @@ function App() {
     responsive: true,
     maintainAspectRatio: false,
     indexAxis: 'y',
-    plugins: { legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } } },
+    plugins: { 
+      legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } },
+      tooltip: {
+        callbacks: {
+          afterBody: (context) => {
+            const idx = context[0].dataIndex
+            const r = resourceAllocation[idx]
+            if (r) {
+              return [
+                `Utilization: ${r.utilization}%`,
+                `Capacity: ${r.capacity}h`,
+                r.overallocated ? '⚠️ OVERALLOCATED' : ''
+              ].filter(Boolean)
+            }
+            return []
+          }
+        }
+      }
+    },
     scales: {
-      x: { stacked: true, grid: { display: false } },
+      x: { stacked: true, grid: { display: false }, title: { display: true, text: 'Hours' } },
       y: { stacked: true, grid: { display: false } }
     }
   }
@@ -490,9 +510,23 @@ function App() {
 
               {/* Resource Workload */}
               <div className="chart-card">
-                <div className="chart-title">Resource Workload</div>
+                <div className="chart-title-row">
+                  <span className="chart-title">Resource Workload</span>
+                  {resourceAllocation.some(r => r.overallocated) && (
+                    <span className="overallocation-warning">⚠️ Overallocation</span>
+                  )}
+                </div>
                 <div className="resource-chart">
                   <Bar data={resourceChartData} options={resourceChartOptions} />
+                </div>
+                {/* Resource utilization summary */}
+                <div className="resource-summary">
+                  {resourceAllocation.map(r => (
+                    <div key={r.name} className={`resource-badge ${r.overallocated ? 'overallocated' : ''}`}>
+                      <span className="resource-name">{r.name}</span>
+                      <span className="resource-util">{r.utilization}%</span>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -534,17 +568,20 @@ function App() {
             {/* Confirmation Options */}
             {pendingAction && pendingAction.options && (
               <div className="confirmation-options">
-                {pendingAction.options.map(opt => (
-                  <button
-                    key={opt.option}
-                    className={`option-btn ${opt.option === 3 ? 'cancel' : ''}`}
-                    onClick={() => confirmAction(opt.option)}
-                    disabled={loading}
-                  >
-                    <strong>{opt.option}.</strong> {opt.label}
-                    {opt.description && <span className="opt-desc"> — {opt.description}</span>}
-                  </button>
-                ))}
+                {pendingAction.options.map(opt => {
+                  const isCancel = opt.label?.toLowerCase().includes('cancel')
+                  return (
+                    <button
+                      key={opt.option}
+                      className={`option-btn ${isCancel ? 'cancel' : ''}`}
+                      onClick={() => confirmAction(opt.option)}
+                      disabled={loading}
+                    >
+                      <strong>{opt.option}.</strong> {opt.label}
+                      {opt.description && <span className="opt-desc"> — {opt.description}</span>}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>

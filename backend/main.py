@@ -133,6 +133,12 @@ def get_resources():
     return database.get_resources()
 
 
+@app.get("/api/resource-allocation")
+def get_resource_allocation():
+    """Get MS Project-style resource allocation data with capacity, allocation, and utilization."""
+    return database.get_resource_allocation()
+
+
 @app.get("/api/changelog")
 def get_changelog(limit: int = 50):
     """Get recent changelog."""

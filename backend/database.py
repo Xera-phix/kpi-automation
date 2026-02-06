@@ -344,6 +344,70 @@ def get_resources():
         return [dict(row) for row in rows]
 
 
+def get_resource_allocation():
+    """
+    Get resource allocation data in MS Project style.
+    Returns capacity, allocated hours, remaining, completed, and utilization per resource.
+    """
+    resources = get_resources()
+    tasks = get_all_tasks()
+    
+    # Calculate project timeline for capacity estimation
+    from datetime import datetime
+    all_dates = []
+    for t in tasks:
+        try:
+            if t.get("start_date"):
+                all_dates.append(datetime.strptime(t["start_date"], "%Y-%m-%d"))
+            if t.get("finish_date"):
+                all_dates.append(datetime.strptime(t["finish_date"], "%Y-%m-%d"))
+        except:
+            pass
+    
+    if all_dates:
+        min_date = min(all_dates)
+        max_date = max(all_dates)
+        project_days = (max_date - min_date).days + 1
+    else:
+        project_days = 30  # Default
+    
+    result = []
+    for r in resources:
+        resource_name = r["name"]
+        hours_per_day = r.get("available_hours_per_day", 8)
+        
+        # Capacity = hours per day * work days in project (assume 5/7 are work days)
+        work_days = int(project_days * 5 / 7)
+        capacity = hours_per_day * work_days
+        
+        # Get all tasks for this resource
+        resource_tasks = [t for t in tasks if t.get("resource") == resource_name]
+        
+        # Allocation = total work hours assigned to this resource
+        allocated = sum(t.get("work_hours", 0) or 0 for t in resource_tasks)
+        completed = sum(t.get("hours_completed", 0) or 0 for t in resource_tasks)
+        remaining = sum(t.get("hours_remaining", 0) or 0 for t in resource_tasks)
+        
+        # Utilization percentage (allocation / capacity)
+        utilization = (allocated / capacity * 100) if capacity > 0 else 0
+        
+        # Overallocated if utilization > 100%
+        overallocated = utilization > 100
+        
+        result.append({
+            "name": resource_name,
+            "capacity": round(capacity, 1),
+            "allocated": round(allocated, 1),
+            "completed": round(completed, 1),
+            "remaining": round(remaining, 1),
+            "available": round(max(0, capacity - allocated), 1),
+            "utilization": round(utilization, 1),
+            "overallocated": overallocated,
+        })
+    
+    return result
+
+
 def get_summary():
     """Get aggregated summary statistics with earned value."""
     with get_db() as conn:
@@ -432,10 +496,14 @@ def get_scurve_data():
 def get_project_scurve_data(parent_task_name: str):
     """Get S-curve data for a specific project (parent task and its children)."""
     tasks = get_all_tasks()
-    
+
     # Filter to only this project's tasks
-    project_tasks = [t for t in tasks if t["task"] == parent_task_name or t["parent_task"] == parent_task_name]
-    
+    project_tasks = [
+        t
+        for t in tasks
+        if t["task"] == parent_task_name or t["parent_task"] == parent_task_name
+    ]
+
     if not project_tasks:
         return {"labels": [], "baseline": [], "actual": [], "project": parent_task_name}
 
@@ -495,7 +563,12 @@ def get_project_scurve_data(parent_task_name: str):
         baseline_data.append(round(cum_b, 1))
         actual_data.append(round(cum_a, 1))
 
-    return {"labels": labels, "baseline": baseline_data, "actual": actual_data, "project": parent_task_name}
+    return {
+        "labels": labels,
+        "baseline": baseline_data,
+        "actual": actual_data,
+        "project": parent_task_name,
+    }
 
 
 # === Pending Actions (Multi-turn AI) ===
@@ -544,7 +617,7 @@ def execute_pending_action(action_id: int, chosen_option: int):
     if not action:
         return {"success": False, "message": "Action not found or expired"}
 
-    # Find option by option number (1, 2, 3)
+    # Find option by option number (1, 2, 3, 4, 5 etc.)
     option = None
     for opt in action["options"]:
         if opt.get("option") == chosen_option:
@@ -554,8 +627,14 @@ def execute_pending_action(action_id: int, chosen_option: int):
     if not option:
         return {"success": False, "message": f"Invalid option: {chosen_option}"}
 
-    # Handle cancel option
-    if chosen_option == 3 or option.get("label", "").lower() == "cancel":
+    # Handle cancel option (last option or label contains "cancel")
+    is_cancel = (
+        option.get("label", "").lower() == "cancel" 
+        or "cancel" in option.get("label", "").lower()
+        or len(option.get("changes", [])) == 0 and "cancel" in option.get("description", "").lower()
+    )
+    
+    if is_cancel:
         with get_db() as conn:
             conn.execute(
                 "UPDATE pending_actions SET status = 'cancelled' WHERE id = ?",

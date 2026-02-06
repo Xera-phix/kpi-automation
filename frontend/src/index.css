@@ -552,6 +552,45 @@ body {
   height: 150px;
 }
 
+/* Resource allocation summary */
+.resource-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.resource-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: #e5e7eb;
+  border-radius: 12px;
+  font-size: 10px;
+}
+
+.resource-badge.overallocated {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.resource-name {
+  font-weight: 500;
+}
+
+.resource-util {
+  font-weight: 600;
+}
+
+.overallocation-warning {
+  font-size: 10px;
+  color: #dc2626;
+  font-weight: 500;
+}
+
 .phase-chart {
   height: 140px;
   display: flex;

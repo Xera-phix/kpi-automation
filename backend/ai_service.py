@@ -76,7 +76,7 @@ def call_llm(prompt: str) -> dict:
 
 
 def detect_phase_adjustment(query: str, tasks: list) -> dict:
-    """Detect if query is about phase-specific adjustments."""
+    """Detect if query is about adding/adjusting hours to a task."""
     query_lower = query.lower()
 
     phase_keywords = {
@@ -91,10 +91,22 @@ def detect_phase_adjustment(query: str, tasks: list) -> dict:
             detected_phase = phase
             break
 
+    # Detect hours being added/changed
     hours_match = re.search(
         r"(\d+)\s*(?:hours?|hrs?|h)\s*(?:more|longer|extra|additional)?", query_lower
     )
+    if not hours_match:
+        # Also try patterns like "add 10 hours", "takes 10 hours longer"
+        hours_match = re.search(r"add\s+(\d+)\s*(?:hours?|hrs?|h)?", query_lower)
+    if not hours_match:
+        hours_match = re.search(r"(\d+)\s*(?:hours?|hrs?|h)", query_lower)
+    
     hours_delta = float(hours_match.group(1)) if hours_match else None
+
+    # Check if this is an "add hours" type request
+    is_add_hours_request = hours_delta is not None and any(
+        kw in query_lower for kw in ["add", "more", "longer", "extra", "additional", "increase", "taking"]
+    )
 
     task_match = None
     for t in tasks:
@@ -102,13 +114,21 @@ def detect_phase_adjustment(query: str, tasks: list) -> dict:
             task_match = t
             break
 
+    # Needs clarification if:
+    # 1. Phase specified + hours + task found (existing behavior)
+    # 2. OR hours being added but NO phase specified (need to ask which phase)
+    needs_phase_clarification = (
+        (detected_phase is not None and hours_delta is not None and task_match is not None)
+        or (is_add_hours_request and task_match is not None and detected_phase is None)
+    )
+
     return {
         "phase": detected_phase,
         "hours_delta": hours_delta,
         "task": task_match,
-        "needs_clarification": detected_phase is not None
-        and hours_delta is not None
-        and task_match is not None,
+        "needs_clarification": needs_phase_clarification,
+        "is_add_hours_request": is_add_hours_request,
+        "phase_not_specified": detected_phase is None and is_add_hours_request,
     }
 
 
@@ -175,6 +195,75 @@ def create_phase_adjustment_options(task: dict, phase: str, hours_delta: float) 
     return [option_a, option_b, option_c]
 
 
+def create_phase_selection_options(task: dict, hours_delta: float) -> list:
+    """Create options when user didn't specify which phase to add hours to."""
+    current_total = task["work_hours"]
+    new_total = current_total + hours_delta
+    
+    current_dev = task.get("dev_hours", 0)
+    current_test = task.get("test_hours", 0)
+    current_review = task.get("review_hours", 0)
+    
+    options = [
+        {
+            "option": 1,
+            "label": f"Add to Development (+{hours_delta}h)",
+            "description": f"Dev: {current_dev}h → {current_dev + hours_delta}h | Total: {current_total}h → {new_total}h",
+            "changes": [
+                {"id": task["id"], "field": "dev_hours", "value": current_dev + hours_delta},
+                {"id": task["id"], "field": "work_hours", "value": new_total},
+            ],
+        },
+        {
+            "option": 2,
+            "label": f"Add to Testing (+{hours_delta}h)",
+            "description": f"Test: {current_test}h → {current_test + hours_delta}h | Total: {current_total}h → {new_total}h",
+            "changes": [
+                {"id": task["id"], "field": "test_hours", "value": current_test + hours_delta},
+                {"id": task["id"], "field": "work_hours", "value": new_total},
+            ],
+        },
+        {
+            "option": 3,
+            "label": f"Add to Review (+{hours_delta}h)",
+            "description": f"Review: {current_review}h → {current_review + hours_delta}h | Total: {current_total}h → {new_total}h",
+            "changes": [
+                {"id": task["id"], "field": "review_hours", "value": current_review + hours_delta},
+                {"id": task["id"], "field": "work_hours", "value": new_total},
+            ],
+        },
+        {
+            "option": 4,
+            "label": "Scale all phases proportionally",
+            "description": f"Distribute {hours_delta}h across Dev/Test/Review based on current ratios",
+            "changes": [],  # Will be calculated when executed
+            "scale_all": True,
+        },
+        {
+            "option": 5,
+            "label": "Cancel",
+            "description": "No changes",
+            "changes": [],
+        },
+    ]
+    
+    # Calculate scale_all option changes
+    if current_total > 0:
+        scale_factor = new_total / current_total
+        new_dev = round(current_dev * scale_factor, 1)
+        new_test = round(current_test * scale_factor, 1)
+        new_review = round(current_review * scale_factor, 1)
+        options[3]["changes"] = [
+            {"id": task["id"], "field": "dev_hours", "value": new_dev},
+            {"id": task["id"], "field": "test_hours", "value": new_test},
+            {"id": task["id"], "field": "review_hours", "value": new_review},
+            {"id": task["id"], "field": "work_hours", "value": new_total},
+        ]
+        options[3]["description"] = f"Dev: {new_dev}h | Test: {new_test}h | Review: {new_review}h"
+    
+    return options
+
+
 def process_ai_request(query: str) -> dict:
     """Send query to LLM with phase-aware logic and clarification."""
     tasks = get_all_tasks()
@@ -184,10 +273,28 @@ def process_ai_request(query: str) -> dict:
 
     if phase_detection["needs_clarification"]:
         task = phase_detection["task"]
-        phase = phase_detection["phase"]
         hours_delta = phase_detection["hours_delta"]
+        phase = phase_detection["phase"]
 
-        # Check lead preference
+        # Case 1: Phase NOT specified - ask which phase to add to
+        if phase_detection["phase_not_specified"]:
+            options = create_phase_selection_options(task, hours_delta)
+            action_id = create_pending_action(
+                task["id"], "phase_selection", query, options
+            )
+
+            return {
+                "success": True,
+                "data": {
+                    "reply": f"📋 Which phase of **{task['task']}** should I add {hours_delta}h to?",
+                    "needs_confirmation": True,
+                    "pending_action_id": action_id,
+                    "options": options,
+                    "changes": [],
+                },
+            }
+
+        # Case 2: Phase IS specified - check lead preference
         pref = get_lead_preference(task["resource"])
 
         if pref and pref.get("default_adjustment_mode") not in (None, "ask"):
