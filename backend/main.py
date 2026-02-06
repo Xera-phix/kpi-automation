@@ -9,7 +9,7 @@ Run: uvicorn main:app --reload --port 8000
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import database
 import ai_service
 
@@ -57,8 +57,14 @@ class TaskUpdate(BaseModel):
     hours_remaining: Optional[float] = None
 
 
+class ChatMessage(BaseModel):
+    role: str  # 'user' or 'assistant'
+    content: str
+
+
 class ChatRequest(BaseModel):
     query: str
+    history: Optional[List[ChatMessage]] = None  # Previous conversation messages
 
 
 class ConfirmActionRequest(BaseModel):
@@ -156,7 +162,12 @@ def get_changelog(limit: int = 50):
 @app.post("/api/chat")
 def chat(request: ChatRequest):
     """Process AI chat request."""
-    result = ai_service.chat(request.query)
+    # Convert history to format expected by ai_service
+    history = None
+    if request.history:
+        history = [{"role": m.role, "content": m.content} for m in request.history]
+
+    result = ai_service.chat(request.query, history=history)
     if not result["success"]:
         raise HTTPException(status_code=500, detail=result.get("message", "AI error"))
     return result

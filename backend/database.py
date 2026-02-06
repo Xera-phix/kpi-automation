@@ -312,7 +312,91 @@ def update_task(task_id: int, updates: dict):
             values,
         )
         conn.commit()
-        return get_task(task_id)
+
+    # After updating subtask, recalculate parent task totals
+    updated_task = get_task(task_id)
+    if updated_task and updated_task.get("parent_task"):
+        update_parent_task_totals(updated_task["parent_task"])
+
+    return get_task(task_id)
+
+
+def update_parent_task_totals(parent_task_name: str):
+    """Recalculate parent task totals based on all subtasks."""
+    with get_db() as conn:
+        # Get all subtasks for this parent
+        subtasks = conn.execute(
+            "SELECT * FROM tasks WHERE parent_task = ?", (parent_task_name,)
+        ).fetchall()
+
+        if not subtasks:
+            return
+
+        subtasks = [dict(row) for row in subtasks]
+
+        # Sum up subtask values
+        total_work_hours = sum(t.get("work_hours", 0) or 0 for t in subtasks)
+        total_baseline_hours = sum(t.get("baseline_hours", 0) or 0 for t in subtasks)
+        total_hours_completed = sum(t.get("hours_completed", 0) or 0 for t in subtasks)
+        total_hours_remaining = sum(t.get("hours_remaining", 0) or 0 for t in subtasks)
+        total_earned_value = sum(t.get("earned_value", 0) or 0 for t in subtasks)
+
+        # Phase hours
+        total_dev_hours = sum(t.get("dev_hours", 0) or 0 for t in subtasks)
+        total_test_hours = sum(t.get("test_hours", 0) or 0 for t in subtasks)
+        total_review_hours = sum(t.get("review_hours", 0) or 0 for t in subtasks)
+
+        # Calculate overall percent complete (weighted by work_hours)
+        if total_work_hours > 0:
+            weighted_percent = (
+                sum(
+                    (t.get("percent_complete", 0) or 0) * (t.get("work_hours", 0) or 0)
+                    for t in subtasks
+                )
+                / total_work_hours
+            )
+            overall_percent = round(weighted_percent)
+        else:
+            overall_percent = 0
+
+        # Get earliest start and latest finish from subtasks
+        start_dates = [t["start_date"] for t in subtasks if t.get("start_date")]
+        finish_dates = [t["finish_date"] for t in subtasks if t.get("finish_date")]
+        earliest_start = min(start_dates) if start_dates else None
+        latest_finish = max(finish_dates) if finish_dates else None
+
+        # Update the parent task
+        conn.execute(
+            """UPDATE tasks SET 
+                work_hours = ?,
+                baseline_hours = ?,
+                hours_completed = ?,
+                hours_remaining = ?,
+                earned_value = ?,
+                dev_hours = ?,
+                test_hours = ?,
+                review_hours = ?,
+                percent_complete = ?,
+                start_date = COALESCE(?, start_date),
+                finish_date = COALESCE(?, finish_date),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE task = ?""",
+            (
+                round(total_work_hours, 1),
+                round(total_baseline_hours, 1),
+                round(total_hours_completed, 1),
+                round(total_hours_remaining, 1),
+                round(total_earned_value, 1),
+                round(total_dev_hours, 1),
+                round(total_test_hours, 1),
+                round(total_review_hours, 1),
+                overall_percent,
+                earliest_start,
+                latest_finish,
+                parent_task_name,
+            ),
+        )
+        conn.commit()
 
 
 def log_change(action: str, task_name: str, resource: str, details: str):
@@ -435,13 +519,13 @@ def get_scurve_data():
     """
     Get S-curve data with three lines:
     - Baseline: Planned cumulative baseline_hours
-    - Scheduled: Current cumulative work_hours  
+    - Scheduled: Current cumulative work_hours
     - Earned: Cumulative earned value (baseline × percent_complete)
-    
+
     Uses simple date-based accumulation for clarity.
     """
     from datetime import datetime, timedelta
-    
+
     tasks = get_all_tasks()
     if not tasks:
         return {"labels": [], "baseline": [], "scheduled": [], "earned": []}
@@ -470,7 +554,7 @@ def get_scurve_data():
     while current <= max_date:
         timeline.append(current)
         current += timedelta(days=7)
-    
+
     # Ensure we have at least the end date
     if not timeline or timeline[-1] < max_date:
         timeline.append(max_date)
@@ -480,24 +564,24 @@ def get_scurve_data():
     baseline_data = []
     scheduled_data = []
     earned_data = []
-    
+
     for point_date in timeline:
         labels.append(point_date.strftime("%b %d"))
-        
+
         baseline_cum = 0
         scheduled_cum = 0
         earned_cum = 0
-        
+
         for t in tasks:
             try:
                 start = datetime.strptime(t["start_date"], "%Y-%m-%d")
                 finish = datetime.strptime(t["finish_date"], "%Y-%m-%d")
-                
+
                 baseline_hours = float(t.get("baseline_hours", 0) or 0)
                 work_hours = float(t.get("work_hours", 0) or 0)
                 percent = float(t.get("percent_complete", 0) or 0) / 100.0
                 earned_value = baseline_hours * percent
-                
+
                 if point_date < start:
                     # Task hasn't started - add nothing
                     continue
@@ -513,16 +597,16 @@ def get_scurve_data():
                     duration = (finish - start).days or 1
                     elapsed = (point_date - start).days
                     portion = elapsed / duration
-                    
+
                     baseline_cum += baseline_hours * portion
                     scheduled_cum += work_hours * portion
                     # Earned value proportional to actual completion
                     if point_date <= today:
                         earned_cum += earned_value * portion
-                        
+
             except Exception:
                 continue
-        
+
         baseline_data.append(round(baseline_cum, 1))
         scheduled_data.append(round(scheduled_cum, 1))
         earned_data.append(round(earned_cum, 1))
@@ -531,14 +615,14 @@ def get_scurve_data():
         "labels": labels,
         "baseline": baseline_data,
         "scheduled": scheduled_data,
-        "earned": earned_data
+        "earned": earned_data,
     }
 
 
 def get_project_scurve_data(parent_task_name: str):
     """Get S-curve data for a specific project - same logic as main S-curve but filtered."""
     from datetime import datetime, timedelta
-    
+
     tasks = get_all_tasks()
 
     # Filter to only this project's tasks
@@ -549,7 +633,13 @@ def get_project_scurve_data(parent_task_name: str):
     ]
 
     if not project_tasks:
-        return {"labels": [], "baseline": [], "scheduled": [], "earned": [], "project": parent_task_name}
+        return {
+            "labels": [],
+            "baseline": [],
+            "scheduled": [],
+            "earned": [],
+            "project": parent_task_name,
+        }
 
     # Get date range
     all_dates = []
@@ -563,7 +653,13 @@ def get_project_scurve_data(parent_task_name: str):
             pass
 
     if not all_dates:
-        return {"labels": [], "baseline": [], "scheduled": [], "earned": [], "project": parent_task_name}
+        return {
+            "labels": [],
+            "baseline": [],
+            "scheduled": [],
+            "earned": [],
+            "project": parent_task_name,
+        }
 
     min_date = min(all_dates)
     max_date = max(all_dates)
@@ -583,24 +679,24 @@ def get_project_scurve_data(parent_task_name: str):
     baseline_data = []
     scheduled_data = []
     earned_data = []
-    
+
     for point_date in timeline:
         labels.append(point_date.strftime("%b %d"))
-        
+
         baseline_cum = 0
         scheduled_cum = 0
         earned_cum = 0
-        
+
         for t in project_tasks:
             try:
                 start = datetime.strptime(t["start_date"], "%Y-%m-%d")
                 finish = datetime.strptime(t["finish_date"], "%Y-%m-%d")
-                
+
                 baseline_hours = float(t.get("baseline_hours", 0) or 0)
                 work_hours = float(t.get("work_hours", 0) or 0)
                 percent = float(t.get("percent_complete", 0) or 0) / 100.0
                 earned_value = baseline_hours * percent
-                
+
                 if point_date < start:
                     continue
                 elif point_date >= finish:
@@ -612,15 +708,15 @@ def get_project_scurve_data(parent_task_name: str):
                     duration = (finish - start).days or 1
                     elapsed = (point_date - start).days
                     portion = elapsed / duration
-                    
+
                     baseline_cum += baseline_hours * portion
                     scheduled_cum += work_hours * portion
                     if point_date <= today:
                         earned_cum += earned_value * portion
-                        
+
             except Exception:
                 continue
-        
+
         baseline_data.append(round(baseline_cum, 1))
         scheduled_data.append(round(scheduled_cum, 1))
         earned_data.append(round(earned_cum, 1))
