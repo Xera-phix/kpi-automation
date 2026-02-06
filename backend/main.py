@@ -184,6 +184,82 @@ def confirm_action(request: ConfirmActionRequest):
     return result
 
 
+# === Timeline / Gantt Endpoints ===
+
+
+@app.get("/api/timeline")
+def get_timeline():
+    """Get all timeline/Gantt data (tasks, dependencies, milestones)."""
+    return database.get_timeline_data()
+
+
+@app.get("/api/dependencies")
+def get_dependencies():
+    """Get all task dependencies."""
+    return database.get_all_dependencies()
+
+
+class DependencyCreate(BaseModel):
+    predecessor_id: int
+    successor_id: int
+    dependency_type: str = "FS"
+    lag_days: int = 0
+
+
+@app.post("/api/dependencies")
+def create_dependency(dep: DependencyCreate):
+    """Add a dependency between two tasks."""
+    result = database.add_dependency(dep.predecessor_id, dep.successor_id, dep.dependency_type, dep.lag_days)
+    if not result:
+        raise HTTPException(status_code=404, detail="One or both tasks not found")
+    return result
+
+
+@app.delete("/api/dependencies/{dep_id}")
+def delete_dependency(dep_id: int):
+    """Remove a dependency."""
+    database.remove_dependency(dep_id)
+    return {"success": True}
+
+
+@app.get("/api/milestones")
+def get_milestones():
+    """Get all milestones."""
+    return database.get_all_milestones()
+
+
+class MilestoneCreate(BaseModel):
+    name: str
+    date: str
+    color: str = "#9333ea"
+    description: str = ""
+
+
+@app.post("/api/milestones")
+def create_milestone(ms: MilestoneCreate):
+    """Add a milestone."""
+    return database.add_milestone(ms.name, ms.date, ms.color, ms.description)
+
+
+@app.delete("/api/milestones/{milestone_id}")
+def delete_milestone(milestone_id: int):
+    """Remove a milestone."""
+    database.remove_milestone(milestone_id)
+    return {"success": True}
+
+
+@app.get("/api/labor-forecast")
+def get_labor_forecast(months: int = 12):
+    """Get 12-month labor forecast by resource."""
+    return database.get_labor_forecast(months)
+
+
+@app.get("/api/resource-load")
+def get_resource_load(weeks: int = 8):
+    """Get weekly resource load for overload detection."""
+    return database.get_resource_load(weeks)
+
+
 # === Startup ===
 
 

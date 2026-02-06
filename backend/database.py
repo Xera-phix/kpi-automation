@@ -84,6 +84,27 @@ CREATE TABLE IF NOT EXISTS pending_actions (
 CREATE INDEX IF NOT EXISTS idx_tasks_resource ON tasks(resource);
 CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_task);
 CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_actions(status);
+
+CREATE TABLE IF NOT EXISTS task_dependencies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    predecessor_id INTEGER NOT NULL REFERENCES tasks(id),
+    successor_id INTEGER NOT NULL REFERENCES tasks(id),
+    dependency_type TEXT DEFAULT 'FS',
+    lag_days INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS milestones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    date TEXT NOT NULL,
+    color TEXT DEFAULT '#9333ea',
+    description TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_dep_pred ON task_dependencies(predecessor_id);
+CREATE INDEX IF NOT EXISTS idx_dep_succ ON task_dependencies(successor_id);
 """
 
 
@@ -918,6 +939,225 @@ def adjust_task_phase(
         }
 
     return update_task(task_id, updates)
+
+
+# ============================================================================
+# TIMELINE / GANTT DATA
+# ============================================================================
+
+
+def get_timeline_data():
+    """Get all data needed for timeline/Gantt visualization."""
+    tasks = get_all_tasks()
+    dependencies = get_all_dependencies()
+    milestones = get_all_milestones()
+
+    return {
+        "tasks": tasks,
+        "dependencies": dependencies,
+        "milestones": milestones,
+    }
+
+
+def get_all_dependencies():
+    """Get all task dependencies."""
+    with get_db() as conn:
+        rows = conn.execute(
+            """SELECT d.*, 
+                      p.task as predecessor_name, p.resource as predecessor_resource,
+                      s.task as successor_name, s.resource as successor_resource
+               FROM task_dependencies d
+               JOIN tasks p ON d.predecessor_id = p.id
+               JOIN tasks s ON d.successor_id = s.id
+               ORDER BY d.id"""
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def add_dependency(predecessor_id: int, successor_id: int, dep_type: str = "FS", lag: int = 0):
+    """Add a dependency between two tasks."""
+    with get_db() as conn:
+        pred = conn.execute("SELECT id FROM tasks WHERE id = ?", (predecessor_id,)).fetchone()
+        succ = conn.execute("SELECT id FROM tasks WHERE id = ?", (successor_id,)).fetchone()
+        if not pred or not succ:
+            return None
+
+        existing = conn.execute(
+            "SELECT id FROM task_dependencies WHERE predecessor_id = ? AND successor_id = ?",
+            (predecessor_id, successor_id)
+        ).fetchone()
+        if existing:
+            return {"id": existing["id"], "message": "Dependency already exists"}
+
+        cursor = conn.execute(
+            """INSERT INTO task_dependencies (predecessor_id, successor_id, dependency_type, lag_days)
+               VALUES (?, ?, ?, ?)""",
+            (predecessor_id, successor_id, dep_type, lag)
+        )
+        conn.commit()
+        return {"id": cursor.lastrowid}
+
+
+def remove_dependency(dep_id: int):
+    """Remove a dependency."""
+    with get_db() as conn:
+        conn.execute("DELETE FROM task_dependencies WHERE id = ?", (dep_id,))
+        conn.commit()
+        return True
+
+
+def get_all_milestones():
+    """Get all milestones."""
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM milestones ORDER BY date").fetchall()
+        return [dict(r) for r in rows]
+
+
+def add_milestone(name: str, date: str, color: str = "#9333ea", description: str = ""):
+    """Add a milestone."""
+    with get_db() as conn:
+        cursor = conn.execute(
+            "INSERT INTO milestones (name, date, color, description) VALUES (?, ?, ?, ?)",
+            (name, date, color, description)
+        )
+        conn.commit()
+        return {"id": cursor.lastrowid}
+
+
+def remove_milestone(milestone_id: int):
+    """Remove a milestone."""
+    with get_db() as conn:
+        conn.execute("DELETE FROM milestones WHERE id = ?", (milestone_id,))
+        conn.commit()
+        return True
+
+
+def get_labor_forecast(months_ahead: int = 12):
+    """Calculate labor forecast: hours per resource per month for the next N months."""
+    from datetime import datetime, timedelta
+    import calendar
+
+    tasks = get_all_tasks()
+    resources = get_resources()
+    today = datetime.now()
+
+    months = []
+    for i in range(months_ahead):
+        year = today.year + (today.month + i - 1) // 12
+        month = (today.month + i - 1) % 12 + 1
+        _, last_day = calendar.monthrange(year, month)
+        months.append({
+            "label": f"{calendar.month_abbr[month]} '{str(year)[-2:]}",
+            "start": datetime(year, month, 1),
+            "end": datetime(year, month, last_day),
+        })
+
+    forecast = {}
+    for resource in resources:
+        name = resource["name"]
+        forecast[name] = []
+
+        for month_bucket in months:
+            month_hours = 0.0
+            for task in tasks:
+                if task.get("resource") != name:
+                    continue
+                if not task.get("start_date") or not task.get("finish_date"):
+                    continue
+
+                try:
+                    task_start = datetime.strptime(task["start_date"], "%m/%d/%Y")
+                    task_end = datetime.strptime(task["finish_date"], "%m/%d/%Y")
+                except (ValueError, TypeError):
+                    try:
+                        task_start = datetime.strptime(task["start_date"], "%Y-%m-%d")
+                        task_end = datetime.strptime(task["finish_date"], "%Y-%m-%d")
+                    except (ValueError, TypeError):
+                        continue
+
+                overlap_start = max(task_start, month_bucket["start"])
+                overlap_end = min(task_end, month_bucket["end"])
+
+                if overlap_start <= overlap_end:
+                    total_days = max((task_end - task_start).days, 1)
+                    overlap_days = (overlap_end - overlap_start).days + 1
+                    remaining = task.get("hours_remaining", task.get("work_hours", 0)) or 0
+                    month_hours += remaining * (overlap_days / total_days)
+
+            forecast[name].append(round(month_hours, 1))
+
+    return {
+        "months": [m["label"] for m in months],
+        "forecast": forecast,
+        "capacity_per_month": 160,
+    }
+
+
+def get_resource_load(weeks_ahead: int = 8):
+    """Get weekly resource load for overload detection."""
+    from datetime import datetime, timedelta
+
+    tasks = get_all_tasks()
+    resources = get_resources()
+    today = datetime.now()
+
+    weeks = []
+    for i in range(weeks_ahead):
+        week_start = today + timedelta(weeks=i)
+        week_start = week_start - timedelta(days=week_start.weekday())
+        week_end = week_start + timedelta(days=4)
+        weeks.append({
+            "label": f"Wk {week_start.strftime('%m/%d')}",
+            "start": week_start,
+            "end": week_end,
+        })
+
+    load = {}
+    for resource in resources:
+        name = resource["name"]
+        load[name] = {"weeks": [], "tasks": []}
+
+        resource_tasks = [t for t in tasks if t.get("resource") == name]
+
+        for week_bucket in weeks:
+            week_hours = 0.0
+            for task in resource_tasks:
+                if not task.get("start_date") or not task.get("finish_date"):
+                    continue
+                try:
+                    task_start = datetime.strptime(task["start_date"], "%m/%d/%Y")
+                    task_end = datetime.strptime(task["finish_date"], "%m/%d/%Y")
+                except (ValueError, TypeError):
+                    try:
+                        task_start = datetime.strptime(task["start_date"], "%Y-%m-%d")
+                        task_end = datetime.strptime(task["finish_date"], "%Y-%m-%d")
+                    except (ValueError, TypeError):
+                        continue
+
+                overlap_start = max(task_start, week_bucket["start"])
+                overlap_end = min(task_end, week_bucket["end"])
+
+                if overlap_start <= overlap_end:
+                    total_days = max((task_end - task_start).days, 1)
+                    overlap_days = (overlap_end - overlap_start).days + 1
+                    remaining = task.get("hours_remaining", task.get("work_hours", 0)) or 0
+                    week_hours += remaining * (overlap_days / total_days)
+
+            load[name]["weeks"].append(round(week_hours, 1))
+
+        load[name]["tasks"] = [
+            {"id": t["id"], "name": t["task"], "hours": t.get("work_hours", 0),
+             "remaining": t.get("hours_remaining", t.get("work_hours", 0)),
+             "percent": t.get("percent_complete", 0),
+             "start": t.get("start_date"), "end": t.get("finish_date")}
+            for t in resource_tasks
+        ]
+
+    return {
+        "weeks": [w["label"] for w in weeks],
+        "load": load,
+        "capacity_per_week": 40,
+    }
 
 
 if __name__ == "__main__":
