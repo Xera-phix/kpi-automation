@@ -209,7 +209,9 @@ class DependencyCreate(BaseModel):
 @app.post("/api/dependencies")
 def create_dependency(dep: DependencyCreate):
     """Add a dependency between two tasks."""
-    result = database.add_dependency(dep.predecessor_id, dep.successor_id, dep.dependency_type, dep.lag_days)
+    result = database.add_dependency(
+        dep.predecessor_id, dep.successor_id, dep.dependency_type, dep.lag_days
+    )
     if not result:
         raise HTTPException(status_code=404, detail="One or both tasks not found")
     return result

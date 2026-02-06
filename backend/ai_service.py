@@ -525,6 +525,15 @@ def detect_intent(query: str, context: Dict) -> Dict[str, Any]:
         intent["dates"].extend(matches)
 
     if "add" in query_lower and any(x in query_lower for x in ["hour", "time"]):
+        intent["action_keywords"].append("log_hours")
+    if any(
+        x in query_lower for x in ["log", "spent", "worked", "completed", "done"]
+    ) and any(x in query_lower for x in ["hour", "time"]):
+        intent["action_keywords"].append("log_hours")
+    if any(
+        x in query_lower
+        for x in ["increase scope", "increase budget", "allocate more", "add scope"]
+    ):
         intent["action_keywords"].append("add_hours")
     if "percent" in query_lower or "%" in query:
         intent["action_keywords"].append("set_progress")
@@ -639,31 +648,39 @@ Each task has the following fields:
 ## ACTIONS YOU CAN TAKE
 Return JSON with one of these action types:
 
-### 1. UPDATE FIELDS
+### 1. UPDATE FIELDS (set absolute values)
 {{"action": "update", "changes": [{{"id": 104, "field": "work_hours", "value": 100}}], "reply": "Updated work_hours to 100"}}
 
-### 2. ADD HOURS (specify phase OR mode)
-{{"action": "add_hours", "task_id": 104, "hours": 20, "phase": "development", "reply": "Added 20h to development"}}
-OR
-{{"action": "add_hours", "task_id": 104, "hours": 20, "mode": "scale_all", "reply": "Added 20h scaled"}}
+### 2. LOG HOURS (record completed work — THIS IS THE DEFAULT FOR "add X hours to task")
+Use this when the user says "add hours", "log hours", "I worked X hours", "spent X hours", etc.
+This INCREASES progress: hours_completed goes up, percent_complete recalculates, finish_date adjusts.
+{{"action": "log_hours", "task_id": 104, "hours": 20, "reply": "Logged 20h of completed work on Build 2"}}
+{{"action": "log_hours", "task_id": 104, "hours": 20, "phase": "development", "reply": "Logged 20h of dev work"}}
 
-### 3. QUERY ONLY (no changes)
+### 3. ADD SCOPE (increase budget/allocated hours — use ONLY when user explicitly says "increase scope/budget")
+Use this when user says "increase the budget", "add scope", "allocate more hours", etc.
+This does NOT change progress — it increases the total work_hours (scope increase).
+{{"action": "add_hours", "task_id": 104, "hours": 20, "phase": "development", "reply": "Increased dev budget by 20h"}}
+
+### 4. QUERY ONLY (no changes)
 {{"action": "query", "reply": "Here is the information you asked for..."}}
 
-### 4. NEEDS CLARIFICATION
+### 5. NEEDS CLARIFICATION
 {{"action": "clarify", "question": "Which phase?", "options": ["Development", "Testing", "Review"]}}
 
 ## CRITICAL RULES
-1. Calculate NEW ABSOLUTE values, not deltas
-2. When adding hours to a phase, also update work_hours to match
-3. Dates must be YYYY-MM-DD format
-4. Always include a "reply" field with human-readable explanation
-5. If uncertain, use "clarify" action
-6. For questions without changes, use "query" action
+1. DEFAULT to "log_hours" when user says "add X hours to Y" — they mean completed work
+2. Only use "add_hours" when user explicitly mentions increasing scope, budget, or allocation
+3. Calculate NEW ABSOLUTE values for "update" action, not deltas
+4. When adding hours to a phase, also update work_hours to match
+5. Dates must be YYYY-MM-DD format
+6. Always include a "reply" field with human-readable explanation
+7. If uncertain about which task, use "clarify" action
+8. For questions without changes, use "query" action
 
 ## OUTPUT FORMAT
 Always return valid JSON:
-{{"action": "update|add_hours|query|clarify", "reply": "Human readable response", ...}}
+{{"action": "update|log_hours|add_hours|query|clarify", "reply": "Human readable response", ...}}
 """
 
 
@@ -724,7 +741,7 @@ Analyze the query and respond with appropriate JSON action.
 
 
 def handle_add_hours(data: Dict, context: Dict) -> Dict:
-    """Handle add_hours action with phase selection."""
+    """Handle add_hours action — increases scope/budget (work_hours)."""
     task_id = data.get("task_id")
     hours = data.get("hours", 0)
     phase = data.get("phase")
@@ -743,7 +760,7 @@ def handle_add_hours(data: Dict, context: Dict) -> Dict:
 
     if not phase and not mode:
         if not has_phases:
-            # No phases exist - just add directly to work_hours, skip phase selection
+            # No phases exist - just add directly to work_hours
             current_total = task.get("work_hours", 0)
             new_total = round(current_total + hours, 1)
             changes = [{"id": task_id, "field": "work_hours", "value": new_total}]
@@ -807,6 +824,65 @@ def handle_add_hours(data: Dict, context: Dict) -> Dict:
             )
 
     changes.append({"id": task_id, "field": "work_hours", "value": round(new_total, 1)})
+
+    return {"success": True, "changes": changes}
+
+
+def handle_log_hours(data: Dict, context: Dict) -> Dict:
+    """Handle log_hours action — records completed work, updates progress and dates."""
+    task_id = data.get("task_id")
+    hours = data.get("hours", 0)
+    phase = data.get("phase")
+
+    task = get_task(task_id)
+    if not task:
+        return {"success": False, "message": f"Task {task_id} not found"}
+
+    work_hours = task.get("work_hours", 0) or 0
+    current_completed = task.get("hours_completed", 0) or 0
+    new_completed = current_completed + hours
+
+    changes = []
+
+    # If completed work exceeds allocated hours, increase work_hours too
+    if new_completed > work_hours and work_hours > 0:
+        changes.append(
+            {"id": task_id, "field": "work_hours", "value": round(new_completed, 1)}
+        )
+        work_hours = new_completed
+    elif work_hours <= 0:
+        # Task has no hours allocated — set work_hours to what's been completed
+        changes.append(
+            {"id": task_id, "field": "work_hours", "value": round(new_completed, 1)}
+        )
+        work_hours = new_completed
+
+    # Calculate new percent complete
+    new_percent = (
+        min(round((new_completed / work_hours) * 100), 100) if work_hours > 0 else 0
+    )
+    changes.append({"id": task_id, "field": "percent_complete", "value": new_percent})
+
+    # Update phase completion if phase specified
+    if phase:
+        phase_map = {
+            "development": ("dev_hours", "dev_percent"),
+            "testing": ("test_hours", "test_percent"),
+            "review": ("review_hours", "review_percent"),
+        }
+        if phase in phase_map:
+            hours_field, pct_field = phase_map[phase]
+            phase_total = task.get(hours_field, 0) or 0
+            if phase_total > 0:
+                old_pct = task.get(pct_field, 0) or 0
+                old_phase_completed = phase_total * (old_pct / 100)
+                new_phase_completed = old_phase_completed + hours
+                new_phase_pct = min(
+                    round((new_phase_completed / phase_total) * 100), 100
+                )
+                changes.append(
+                    {"id": task_id, "field": pct_field, "value": new_phase_pct}
+                )
 
     return {"success": True, "changes": changes}
 
@@ -898,8 +974,12 @@ def create_phase_selection_options(task: Dict, hours_delta: float) -> List[Dict]
 
 
 def apply_changes(changes: List[Dict]) -> Dict:
-    """Apply validated changes to the database."""
-    validation = validate_all_changes(changes)
+    """Apply validated changes to the database, batched per task."""
+    # Filter out read-only / auto-calculated fields the AI sometimes tries to set
+    auto_fields = {"variance", "earned_value"}
+    filtered_changes = [c for c in changes if c.get("field") not in auto_fields]
+
+    validation = validate_all_changes(filtered_changes)
 
     if not validation["all_valid"]:
         errors = []
@@ -908,44 +988,41 @@ def apply_changes(changes: List[Dict]) -> Dict:
                 errors.extend(result["errors"])
         return {"success": False, "message": f"Validation failed: {'; '.join(errors)}"}
 
+    # Group all changes by task_id so we apply them in a single update_task call
+    task_updates = {}
+    for change in filtered_changes:
+        task_id = int(change["id"])
+        field = change["field"]
+        value = change["value"]
+        if task_id not in task_updates:
+            task_updates[task_id] = {}
+        task_updates[task_id][field] = value
+
     logs = []
-    all_changes = []
+    total_applied = 0
 
-    for change in changes:
-        task_id = int(change["id"])
-        field = change["field"]
-        value = change["value"]
-
-        dependent = calculate_dependent_changes(task_id, field, value)
-        all_changes.append(change)
-        all_changes.extend(dependent)
-
-    seen = {}
-    for change in all_changes:
-        key = (change["id"], change["field"])
-        seen[key] = change
-    final_changes = list(seen.values())
-
-    for change in final_changes:
-        task_id = int(change["id"])
-        field = change["field"]
-        value = change["value"]
-
+    for task_id, updates in task_updates.items():
         task = get_task(task_id)
         if not task:
             continue
 
-        old_value = task.get(field, "?")
-        update_task(task_id, {field: value})
+        # Log each field change
+        for field, value in updates.items():
+            old_value = task.get(field, "?")
+            logs.append(f"{task['task']}: {field} {old_value} -> {value}")
+
+        # Apply ALL fields for this task in one call
+        update_task(task_id, updates)
+        total_applied += len(updates)
+
         log_change(
             "AI_EDIT",
             task["task"],
-            task["resource"],
-            f"{field}: {old_value} -> {value}",
+            task.get("resource", ""),
+            "; ".join(f"{f}: {task.get(f, '?')} -> {v}" for f, v in updates.items()),
         )
-        logs.append(f"{task['task']}: {field} {old_value} -> {value}")
 
-    return {"success": True, "logs": logs, "changes_applied": len(final_changes)}
+    return {"success": True, "logs": logs, "changes_applied": total_applied}
 
 
 # ============================================================================
@@ -980,6 +1057,27 @@ def chat(query: str, history: Optional[List[Dict]] = None) -> Dict:
             "options": ai_data.get("options", []),
             "changes_count": 0,
         }
+
+    elif action == "log_hours":
+        context = build_full_context()
+        log_result = handle_log_hours(ai_data, context)
+
+        if not log_result.get("success"):
+            return {
+                "success": False,
+                "message": log_result.get("message", "Failed to log hours"),
+            }
+
+        if log_result.get("changes"):
+            apply_result = apply_changes(log_result["changes"])
+            return {
+                "success": True,
+                "reply": reply,
+                "logs": apply_result.get("logs", []),
+                "changes_count": apply_result.get("changes_applied", 0),
+            }
+
+        return {"success": True, "reply": reply, "logs": [], "changes_count": 0}
 
     elif action == "add_hours":
         context = build_full_context()

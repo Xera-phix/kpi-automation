@@ -1,139 +1,179 @@
-# KPI Automation - Project Hours Tracker
+# KPI Automation Dashboard
 
-Automate Microsoft Project updates using natural language commands via VS Code Copilot or a Streamlit web app.
+AI-powered project management dashboard with natural language task updates, S-curve visualization, and resource tracking.
 
-## 🚀 Quick Start (VS Code + Copilot)
+![React](https://img.shields.io/badge/React-18.2-blue) ![FastAPI](https://img.shields.io/badge/FastAPI-0.109-green) ![Python](https://img.shields.io/badge/Python-3.11-yellow) ![Docker](https://img.shields.io/badge/Docker-Ready-blue)
 
-### 1. View the Project Table
+## 🚀 Quick Start
 
-Open `projects.csv` in VS Code. For a better table view, install one of these extensions:
-- **Rainbow CSV** (mechatroner.rainbow-csv) - syntax highlighting
-- **Excel Viewer** (GrapeCity.gc-excelviewer) - spreadsheet view
+### Prerequisites
+- Python 3.11+
+- Node.js 20+
+- GitHub Token (for AI features)
 
-### 2. Talk to Copilot
-
-Open Copilot Chat and type natural language commands:
-
-```
-"Add 5 hours to Fault Code Reporting for Wasim"
-
-"Mark PLID Issue VO as 75% complete"
-
-"Extend the deadline for Build 2 to 2027-02-15"
-
-"Show me a summary of hours by resource"
-```
-
-Copilot will:
-1. Show you the proposed changes
-2. Wait for your approval
-3. Edit the CSV file
-4. Log the change to `changelog.md`
-
-### 3. Command Examples
-
-| You Say | What Happens |
-|---------|--------------|
-| "Wasim needs 8 more hours on Fault Code" | +8h to Work_Hours, recalc finish date, update variance |
-| "Set Bug Fixes to 50% complete" | Updates Percent_Complete to 50 |
-| "Push Standby Mode deadline to Dec 20" | Changes Finish_Date to 2025-12-20 |
-| "What's the total variance?" | Shows summary of hours over/under baseline |
-| "List all of Mengmei's tasks" | Filters and displays tasks for Mengmei |
-
----
-
-## 🖥️ Alternative: Streamlit Web App
-
-A visual web interface with chat is available in `streamlit_app/`.
-
-### Setup
+### 1. Backend Setup
 ```bash
-cd streamlit_app
+cd backend
+python -m venv .venv
+.venv\Scripts\activate  # Windows
 pip install -r requirements.txt
-streamlit run app.py
+
+# Create .env file with your GitHub token
+echo "GITHUB_TOKEN=your_token_here" > ../.env
+
+# Start server
+uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-### Features
-- Interactive table with color-coded variance (red = over baseline)
-- Chat interface for natural language commands
-- Change log panel
-- Mock AI mode (no API key needed for demo)
+### 2. Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 3. Open the App
+- **Dashboard:** http://localhost:5173
+- **API Docs:** http://localhost:8000/docs
 
 ---
 
-## 📁 File Structure
+## ✨ Features
+
+### 🤖 AI-Powered Chat
+Talk to your project data in natural language:
+- *"Add 10 hours to Core Development"* → Logs work, updates progress
+- *"Set Integration Testing to 50%"* → Direct percentage update
+- *"Who's overallocated?"* → Resource analysis
+- *"Show tasks over budget"* → Variance analysis
+
+### 📊 S-Curve Visualization
+Real-time earned value tracking with three curves:
+- **Baseline** (gray): Original plan
+- **Scheduled** (blue): Current plan
+- **Earned** (green): Actual progress
+
+### 👥 Resource Management
+- Capacity vs allocation tracking
+- Overallocation warnings
+- Utilization percentages
+
+### 📅 Timeline & Gantt (POC)
+- Interactive Gantt chart view
+- Milestone tracking
+- Labor forecast heatmap
+
+### 🔗 Dependencies View (POC)
+- Task dependency visualization
+- Resource load analysis
+- Milestone management
+
+---
+
+## 📁 Project Structure
 
 ```
 kpi-automation/
-├── projects.csv           # 📊 Main project data (open this!)
-├── update_project.py      # 🔧 Helper functions for updates
-├── changelog.md           # 📝 Audit trail of all changes
-├── README.md              # 📖 This file
-└── streamlit_app/         # 🌐 Web interface (Option B)
-    ├── app.py
-    ├── requirements.txt
-    └── sample_data.json
+├── backend/
+│   ├── main.py              # FastAPI application
+│   ├── database.py          # SQLite operations, S-curve calculations
+│   ├── ai_service.py        # LLM integration, intent handling
+│   ├── Dockerfile           # Production container
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx          # Main dashboard
+│   │   ├── pages/
+│   │   │   ├── TimelinePage.jsx    # Gantt POC
+│   │   │   └── DependenciesPage.jsx # Dependencies POC
+│   │   └── main.jsx         # Router setup
+│   ├── Dockerfile           # Multi-stage build
+│   └── nginx.conf           # Production proxy
+├── docker-compose.yml       # Container orchestration
+├── projects.csv             # Initial data seed
+└── .env                     # API keys (not committed)
 ```
 
 ---
 
-## 🔧 CLI Usage (Optional)
+## 🐳 Docker Deployment
 
-You can also run commands directly from terminal:
+```bash
+# Build images
+docker-compose build
 
-```powershell
-# List all tasks
-python update_project.py --list
+# Run containers
+docker-compose up -d
 
-# Show summary
-python update_project.py --summary
+# Access app
+# Frontend: http://localhost:3000
+# Backend:  http://localhost:8000
 
-# Add hours to a task
-python update_project.py --add-hours "Fault Code Reporting" 5
-
-# Set completion percentage
-python update_project.py --set-percent "PLID Issue" 50
-
-# Filter by resource
-python update_project.py --add-hours "Bug Fixes" 10 --resource Chethan
+# Stop containers
+docker-compose down
 ```
 
 ---
 
-## 📊 Data Fields
+## 💬 AI Chat Commands
 
-| Column | Description |
-|--------|-------------|
-| ID | Task ID from MS Project |
-| Task | Task name |
-| Resource | Assigned team member |
-| Work_Hours | Current total work hours |
-| Baseline_Hours | Original planned hours |
-| Variance | Work - Baseline (+ = over, - = under) |
-| Start_Date | Task start date (YYYY-MM-DD) |
-| Finish_Date | Task end date (auto-recalculated) |
-| Percent_Complete | Completion percentage |
-| Type | Fixed Work / Fixed Duration |
-| Parent_Task | Parent task for subtasks |
+| Command | Action | Example |
+|---------|--------|---------|
+| Add hours | Logs completed work | *"Add 20 hours to Security Audit"* |
+| Set percent | Updates completion | *"Set Bug Fix to 80%"* |
+| Query status | Returns info | *"What's the status of Core Development?"* |
+| Resource check | Analyzes allocation | *"Is anyone overallocated?"* |
+| Budget analysis | Variance report | *"Which tasks are over budget?"* |
 
 ---
 
-## 🔄 Syncing with MS Project
+## 📊 Data Model
 
-To import changes back to MS Project:
-1. Open MS Project
-2. File → Open → Select `projects.csv`
-3. Follow the import wizard to map columns
+### Key Fields
+| Field | Editable | Description |
+|-------|----------|-------------|
+| `work_hours` | ✅ | Current planned hours |
+| `baseline_hours` | ❌ | Original plan (frozen) |
+| `variance` | ❌ | `work_hours - baseline_hours` |
+| `percent_complete` | ✅ | 0-100% progress |
+| `hours_completed` | ❌ | Auto: `work_hours × %` |
+| `hours_remaining` | ❌ | Auto: `work_hours × (1 - %)` |
+| `earned_value` | ❌ | Auto: `baseline × %` |
+| `finish_date` | ✅ | Auto-adjusts from remaining hours |
 
-To export from MS Project:
-1. File → Save As → CSV format
-2. Replace `projects.csv` with the new export
+### S-Curve Formula
+$$\text{SPI} = \frac{\text{Earned Value}}{\text{Planned Value}} = \frac{\sum(B_i \times \%_i)}{\sum B_i}$$
 
 ---
 
-## 💡 Tips
+## 🔧 API Endpoints
 
-- **Be specific**: "Add 5 hours to Fault Code Reporting Implementation for Wasim" works better than "add hours to that task"
-- **Check changelog**: Review `changelog.md` to see all changes made
-- **Backup**: The original baseline hours are preserved; variance shows drift from plan
-- **Weekends skipped**: Date calculations skip Saturday/Sunday automatically
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/tasks` | GET | All tasks |
+| `/api/tasks/{id}` | PUT | Update task |
+| `/api/chat` | POST | AI chat interface |
+| `/api/scurve` | GET | S-curve data |
+| `/api/summary` | GET | Project summary |
+| `/api/resources` | GET | Resource list |
+| `/api/resource-allocation` | GET | Allocation analysis |
+| `/api/timeline` | GET | Gantt data |
+| `/api/dependencies` | GET | Task dependencies |
+| `/api/milestones` | GET | Project milestones |
+
+---
+
+## �️ Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 18, Vite 5, Tailwind CSS v4, Chart.js, Lucide Icons |
+| Backend | Python 3.11, FastAPI, SQLite, Uvicorn |
+| AI | GPT-4o via GitHub Models API |
+| Containerization | Docker, Docker Compose, nginx |
+
+---
+
+## 📝 License
+
+MIT License - See LICENSE for details.

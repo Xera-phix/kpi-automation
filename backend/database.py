@@ -250,13 +250,29 @@ def get_task(task_id: int):
         return dict(row) if row else None
 
 
-def recalculate_finish_date(start_date_str: str, remaining_hours: float) -> str:
-    """Calculate new finish date based on remaining hours."""
-    try:
-        from datetime import datetime, timedelta
+def parse_date_flexible(date_str: str):
+    """Parse a date string in either YYYY-MM-DD or MM/DD/YYYY format."""
+    if not date_str:
+        return None
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except (ValueError, TypeError):
+            continue
+    return None
 
-        start = datetime.strptime(start_date_str, "%Y-%m-%d")
-        work_days = remaining_hours / HOURS_PER_DAY
+
+def recalculate_finish_date(start_date_str: str, remaining_hours: float) -> str:
+    """Calculate new finish date based on remaining hours from today."""
+    try:
+        from datetime import timedelta
+
+        # Validate start_date is parseable (we don't use it for calc, but need it valid)
+        start = parse_date_flexible(start_date_str)
+        if not start:
+            return start_date_str
+
+        work_days = max(remaining_hours / HOURS_PER_DAY, 0)
         current = datetime.now()
         days_added = 0
         while days_added < work_days:
@@ -264,7 +280,7 @@ def recalculate_finish_date(start_date_str: str, remaining_hours: float) -> str:
             if current.weekday() < 5:  # Skip weekends
                 days_added += 1
         return current.strftime("%Y-%m-%d")
-    except:
+    except Exception:
         return start_date_str
 
 
@@ -316,13 +332,19 @@ def update_task(task_id: int, updates: dict):
     filtered["hours_remaining"] = round(hours_remaining, 1)
     filtered["earned_value"] = round(earned_value, 1)
 
-    # Recalculate finish date if progress or hours changed
-    if "percent_complete" in updates or "work_hours" in updates:
-        if hours_remaining > 0:
+    # Recalculate finish date if progress or hours changed (but don't overwrite explicit finish_date)
+    if (
+        "percent_complete" in updates or "work_hours" in updates
+    ) and "finish_date" not in updates:
+        if hours_remaining > 0 and current_task.get("start_date"):
             new_finish = recalculate_finish_date(
                 current_task["start_date"], hours_remaining
             )
-            filtered["finish_date"] = new_finish
+            if new_finish:
+                filtered["finish_date"] = new_finish
+        elif hours_remaining <= 0:
+            # Task is complete - keep current finish date or set to today
+            pass
 
     set_clause = ", ".join(f"{k} = ?" for k in filtered.keys())
     values = list(filtered.values()) + [task_id]
@@ -974,17 +996,23 @@ def get_all_dependencies():
         return [dict(r) for r in rows]
 
 
-def add_dependency(predecessor_id: int, successor_id: int, dep_type: str = "FS", lag: int = 0):
+def add_dependency(
+    predecessor_id: int, successor_id: int, dep_type: str = "FS", lag: int = 0
+):
     """Add a dependency between two tasks."""
     with get_db() as conn:
-        pred = conn.execute("SELECT id FROM tasks WHERE id = ?", (predecessor_id,)).fetchone()
-        succ = conn.execute("SELECT id FROM tasks WHERE id = ?", (successor_id,)).fetchone()
+        pred = conn.execute(
+            "SELECT id FROM tasks WHERE id = ?", (predecessor_id,)
+        ).fetchone()
+        succ = conn.execute(
+            "SELECT id FROM tasks WHERE id = ?", (successor_id,)
+        ).fetchone()
         if not pred or not succ:
             return None
 
         existing = conn.execute(
             "SELECT id FROM task_dependencies WHERE predecessor_id = ? AND successor_id = ?",
-            (predecessor_id, successor_id)
+            (predecessor_id, successor_id),
         ).fetchone()
         if existing:
             return {"id": existing["id"], "message": "Dependency already exists"}
@@ -992,7 +1020,7 @@ def add_dependency(predecessor_id: int, successor_id: int, dep_type: str = "FS",
         cursor = conn.execute(
             """INSERT INTO task_dependencies (predecessor_id, successor_id, dependency_type, lag_days)
                VALUES (?, ?, ?, ?)""",
-            (predecessor_id, successor_id, dep_type, lag)
+            (predecessor_id, successor_id, dep_type, lag),
         )
         conn.commit()
         return {"id": cursor.lastrowid}
@@ -1018,7 +1046,7 @@ def add_milestone(name: str, date: str, color: str = "#9333ea", description: str
     with get_db() as conn:
         cursor = conn.execute(
             "INSERT INTO milestones (name, date, color, description) VALUES (?, ?, ?, ?)",
-            (name, date, color, description)
+            (name, date, color, description),
         )
         conn.commit()
         return {"id": cursor.lastrowid}
@@ -1046,11 +1074,13 @@ def get_labor_forecast(months_ahead: int = 12):
         year = today.year + (today.month + i - 1) // 12
         month = (today.month + i - 1) % 12 + 1
         _, last_day = calendar.monthrange(year, month)
-        months.append({
-            "label": f"{calendar.month_abbr[month]} '{str(year)[-2:]}",
-            "start": datetime(year, month, 1),
-            "end": datetime(year, month, last_day),
-        })
+        months.append(
+            {
+                "label": f"{calendar.month_abbr[month]} '{str(year)[-2:]}",
+                "start": datetime(year, month, 1),
+                "end": datetime(year, month, last_day),
+            }
+        )
 
     forecast = {}
     for resource in resources:
@@ -1081,7 +1111,9 @@ def get_labor_forecast(months_ahead: int = 12):
                 if overlap_start <= overlap_end:
                     total_days = max((task_end - task_start).days, 1)
                     overlap_days = (overlap_end - overlap_start).days + 1
-                    remaining = task.get("hours_remaining", task.get("work_hours", 0)) or 0
+                    remaining = (
+                        task.get("hours_remaining", task.get("work_hours", 0)) or 0
+                    )
                     month_hours += remaining * (overlap_days / total_days)
 
             forecast[name].append(round(month_hours, 1))
@@ -1106,11 +1138,13 @@ def get_resource_load(weeks_ahead: int = 8):
         week_start = today + timedelta(weeks=i)
         week_start = week_start - timedelta(days=week_start.weekday())
         week_end = week_start + timedelta(days=4)
-        weeks.append({
-            "label": f"Wk {week_start.strftime('%m/%d')}",
-            "start": week_start,
-            "end": week_end,
-        })
+        weeks.append(
+            {
+                "label": f"Wk {week_start.strftime('%m/%d')}",
+                "start": week_start,
+                "end": week_end,
+            }
+        )
 
     load = {}
     for resource in resources:
@@ -1140,16 +1174,23 @@ def get_resource_load(weeks_ahead: int = 8):
                 if overlap_start <= overlap_end:
                     total_days = max((task_end - task_start).days, 1)
                     overlap_days = (overlap_end - overlap_start).days + 1
-                    remaining = task.get("hours_remaining", task.get("work_hours", 0)) or 0
+                    remaining = (
+                        task.get("hours_remaining", task.get("work_hours", 0)) or 0
+                    )
                     week_hours += remaining * (overlap_days / total_days)
 
             load[name]["weeks"].append(round(week_hours, 1))
 
         load[name]["tasks"] = [
-            {"id": t["id"], "name": t["task"], "hours": t.get("work_hours", 0),
-             "remaining": t.get("hours_remaining", t.get("work_hours", 0)),
-             "percent": t.get("percent_complete", 0),
-             "start": t.get("start_date"), "end": t.get("finish_date")}
+            {
+                "id": t["id"],
+                "name": t["task"],
+                "hours": t.get("work_hours", 0),
+                "remaining": t.get("hours_remaining", t.get("work_hours", 0)),
+                "percent": t.get("percent_complete", 0),
+                "start": t.get("start_date"),
+                "end": t.get("finish_date"),
+            }
             for t in resource_tasks
         ]
 
