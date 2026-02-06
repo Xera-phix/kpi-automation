@@ -472,25 +472,17 @@ function App() {
                       {task.finish_date}
                     </td>
                     <td className="progress-cell">
-                      <div className="progress-bar-container" onClick={() => setSelectedTask(task)}>
-                        <div 
-                          className="progress-bar-fill"
-                          style={{ 
-                            width: `${task.percent_complete}%`,
-                            backgroundColor: task.percent_complete >= 100 ? '#10b981' : 
-                                           task.percent_complete >= 50 ? '#3b82f6' : '#f59e0b'
-                          }}
+                      <div className="progress-wrapper">
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={task.percent_complete}
+                          className="progress-slider"
+                          onChange={(e) => updateTask(task.id, 'percent_complete', parseInt(e.target.value))}
                         />
-                        <span className="progress-text">{task.percent_complete}%</span>
+                        <span className="progress-value">{task.percent_complete}%</span>
                       </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={task.percent_complete}
-                        className="progress-slider-hidden"
-                        onChange={(e) => updateTask(task.id, 'percent_complete', parseInt(e.target.value))}
-                      />
                     </td>
                   </tr>
                 )

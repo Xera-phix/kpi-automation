@@ -25,8 +25,10 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "http://localhost:5174",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -47,6 +49,12 @@ class TaskUpdate(BaseModel):
     percent_complete: Optional[int] = None
     task_type: Optional[str] = None
     parent_task: Optional[str] = None
+    # Phase fields
+    dev_hours: Optional[float] = None
+    test_hours: Optional[float] = None
+    review_hours: Optional[float] = None
+    hours_completed: Optional[float] = None
+    hours_remaining: Optional[float] = None
 
 
 class ChatRequest(BaseModel):

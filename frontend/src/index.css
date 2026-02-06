@@ -199,6 +199,26 @@ body {
   text-shadow: 0 0 2px white;
 }
 
+.progress-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-slider {
+  width: 80px;
+  height: 6px;
+  cursor: pointer;
+  accent-color: #3b82f6;
+}
+
+.progress-value {
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 35px;
+  font-family: 'Consolas', monospace;
+}
+
 .progress-slider-hidden {
   width: 100%;
   height: 4px;

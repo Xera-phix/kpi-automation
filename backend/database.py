@@ -433,125 +433,102 @@ def get_summary():
 
 def get_scurve_data():
     """
-    Get S-curve data points with three lines:
-    - Baseline (BCWS): Planned cumulative hours over time
-    - Scheduled (Current): Current scheduled work_hours over time  
-    - Earned Value (BCWP): Baseline hours × percent_complete (actual progress)
+    Get S-curve data with three lines:
+    - Baseline: Planned cumulative baseline_hours
+    - Scheduled: Current cumulative work_hours  
+    - Earned: Cumulative earned value (baseline × percent_complete)
+    
+    Uses simple date-based accumulation for clarity.
     """
+    from datetime import datetime, timedelta
+    
     tasks = get_all_tasks()
     if not tasks:
         return {"labels": [], "baseline": [], "scheduled": [], "earned": []}
 
-    from datetime import datetime, timedelta
-
-    # Collect all dates
-    dates = []
+    # Get date range from tasks
+    all_dates = []
     for t in tasks:
         try:
             if t.get("start_date"):
-                dates.append(datetime.strptime(t["start_date"], "%Y-%m-%d"))
+                all_dates.append(datetime.strptime(t["start_date"], "%Y-%m-%d"))
             if t.get("finish_date"):
-                dates.append(datetime.strptime(t["finish_date"], "%Y-%m-%d"))
+                all_dates.append(datetime.strptime(t["finish_date"], "%Y-%m-%d"))
         except:
             pass
 
-    if not dates:
+    if not all_dates:
         return {"labels": [], "baseline": [], "scheduled": [], "earned": []}
 
-    min_date = min(dates)
-    max_date = max(dates)
+    min_date = min(all_dates)
+    max_date = max(all_dates)
     today = datetime.now()
 
-    # Build timeline with weekly intervals for cleaner chart
-    timeline = {}
+    # Create weekly timeline points
+    timeline = []
     current = min_date
     while current <= max_date:
-        # Use weekly buckets for cleaner visualization
-        week_key = current.strftime("%Y-%m-%d")
-        timeline[week_key] = {"baseline": 0, "scheduled": 0, "earned": 0}
-        current += timedelta(days=7)  # Weekly intervals
+        timeline.append(current)
+        current += timedelta(days=7)
     
-    # Also add the end date
-    end_key = max_date.strftime("%Y-%m-%d")
-    if end_key not in timeline:
-        timeline[end_key] = {"baseline": 0, "scheduled": 0, "earned": 0}
+    # Ensure we have at least the end date
+    if not timeline or timeline[-1] < max_date:
+        timeline.append(max_date)
 
-    # Calculate hours for each task spread across its duration
-    for t in tasks:
-        try:
-            start = datetime.strptime(t["start_date"], "%Y-%m-%d")
-            finish = datetime.strptime(t["finish_date"], "%Y-%m-%d")
-            duration_days = (finish - start).days + 1
-            if duration_days < 1:
-                duration_days = 1
-
-            baseline_hours = t.get("baseline_hours", 0) or 0
-            work_hours = t.get("work_hours", 0) or 0
-            percent = (t.get("percent_complete", 0) or 0) / 100.0
-            
-            # Earned value = baseline × percent complete
-            earned_hours = baseline_hours * percent
-
-            # Find which timeline buckets this task spans
-            for date_str in timeline.keys():
-                bucket_date = datetime.strptime(date_str, "%Y-%m-%d")
-                
-                # Calculate what portion of this task falls before this date
-                if bucket_date < start:
-                    continue  # Task hasn't started yet
-                elif bucket_date >= finish:
-                    # Task is complete by this date - add full hours
-                    timeline[date_str]["baseline"] += baseline_hours / len([d for d in timeline.keys() if datetime.strptime(d, "%Y-%m-%d") >= start and datetime.strptime(d, "%Y-%m-%d") <= finish])
-                    timeline[date_str]["scheduled"] += work_hours / len([d for d in timeline.keys() if datetime.strptime(d, "%Y-%m-%d") >= start and datetime.strptime(d, "%Y-%m-%d") <= finish])
-                else:
-                    # Task is in progress at this bucket
-                    days_elapsed = (bucket_date - start).days + 1
-                    portion = min(1.0, days_elapsed / duration_days)
-                    timeline[date_str]["baseline"] += baseline_hours * portion / len([d for d in timeline.keys() if datetime.strptime(d, "%Y-%m-%d") >= start and datetime.strptime(d, "%Y-%m-%d") <= bucket_date])
-                    timeline[date_str]["scheduled"] += work_hours * portion / len([d for d in timeline.keys() if datetime.strptime(d, "%Y-%m-%d") >= start and datetime.strptime(d, "%Y-%m-%d") <= bucket_date])
-                
-                # Earned value only counts up to today
-                if bucket_date <= today:
-                    if bucket_date >= finish:
-                        timeline[date_str]["earned"] += earned_hours / max(1, len([d for d in timeline.keys() if datetime.strptime(d, "%Y-%m-%d") <= today and datetime.strptime(d, "%Y-%m-%d") >= start]))
-        except Exception as e:
-            continue
-
-    # Sort dates and calculate cumulative values
-    labels = sorted(timeline.keys())
-    
-    # Simpler approach: distribute total hours across timeline proportionally
-    total_baseline = sum(t.get("baseline_hours", 0) or 0 for t in tasks)
-    total_scheduled = sum(t.get("work_hours", 0) or 0 for t in tasks)
-    total_earned = sum((t.get("baseline_hours", 0) or 0) * (t.get("percent_complete", 0) or 0) / 100.0 for t in tasks)
-    
-    n_points = len(labels)
+    # Build cumulative data for each point in timeline
+    labels = []
     baseline_data = []
     scheduled_data = []
     earned_data = []
     
-    for i, date in enumerate(labels):
-        # S-curve shape: slow start, fast middle, slow end
-        # Using a simple sigmoid approximation
-        progress = (i + 1) / n_points
-        # S-curve factor: 3 * progress^2 - 2 * progress^3 (smooth step)
-        s_factor = 3 * progress**2 - 2 * progress**3
+    for point_date in timeline:
+        labels.append(point_date.strftime("%b %d"))
         
-        baseline_data.append(round(total_baseline * s_factor, 1))
-        scheduled_data.append(round(total_scheduled * s_factor, 1))
+        baseline_cum = 0
+        scheduled_cum = 0
+        earned_cum = 0
         
-        # Earned value is linear up to current progress
-        today_str = today.strftime("%Y-%m-%d")
-        if date <= today_str:
-            earned_progress = min(1.0, (i + 1) / n_points)
-            # Scale earned by actual completion percentage of overall project
-            avg_complete = sum(t.get("percent_complete", 0) or 0 for t in tasks) / max(1, len(tasks))
-            earned_data.append(round(total_earned * earned_progress / max(0.01, avg_complete / 100), 1))
-        else:
-            earned_data.append(earned_data[-1] if earned_data else 0)
+        for t in tasks:
+            try:
+                start = datetime.strptime(t["start_date"], "%Y-%m-%d")
+                finish = datetime.strptime(t["finish_date"], "%Y-%m-%d")
+                
+                baseline_hours = float(t.get("baseline_hours", 0) or 0)
+                work_hours = float(t.get("work_hours", 0) or 0)
+                percent = float(t.get("percent_complete", 0) or 0) / 100.0
+                earned_value = baseline_hours * percent
+                
+                if point_date < start:
+                    # Task hasn't started - add nothing
+                    continue
+                elif point_date >= finish:
+                    # Task should be complete - add full planned hours
+                    baseline_cum += baseline_hours
+                    scheduled_cum += work_hours
+                    # Earned value only if this date is in the past
+                    if point_date <= today:
+                        earned_cum += earned_value
+                else:
+                    # Task in progress - add proportional amount
+                    duration = (finish - start).days or 1
+                    elapsed = (point_date - start).days
+                    portion = elapsed / duration
+                    
+                    baseline_cum += baseline_hours * portion
+                    scheduled_cum += work_hours * portion
+                    # Earned value proportional to actual completion
+                    if point_date <= today:
+                        earned_cum += earned_value * portion
+                        
+            except Exception:
+                continue
+        
+        baseline_data.append(round(baseline_cum, 1))
+        scheduled_data.append(round(scheduled_cum, 1))
+        earned_data.append(round(earned_cum, 1))
 
     return {
-        "labels": [datetime.strptime(d, "%Y-%m-%d").strftime("%b %d") for d in labels],
+        "labels": labels,
         "baseline": baseline_data,
         "scheduled": scheduled_data,
         "earned": earned_data
@@ -559,7 +536,9 @@ def get_scurve_data():
 
 
 def get_project_scurve_data(parent_task_name: str):
-    """Get S-curve data for a specific project with baseline, scheduled, and earned value."""
+    """Get S-curve data for a specific project - same logic as main S-curve but filtered."""
+    from datetime import datetime, timedelta
+    
     tasks = get_all_tasks()
 
     # Filter to only this project's tasks
@@ -572,61 +551,79 @@ def get_project_scurve_data(parent_task_name: str):
     if not project_tasks:
         return {"labels": [], "baseline": [], "scheduled": [], "earned": [], "project": parent_task_name}
 
-    from datetime import datetime, timedelta
-
-    dates = []
+    # Get date range
+    all_dates = []
     for t in project_tasks:
         try:
             if t.get("start_date"):
-                dates.append(datetime.strptime(t["start_date"], "%Y-%m-%d"))
+                all_dates.append(datetime.strptime(t["start_date"], "%Y-%m-%d"))
             if t.get("finish_date"):
-                dates.append(datetime.strptime(t["finish_date"], "%Y-%m-%d"))
+                all_dates.append(datetime.strptime(t["finish_date"], "%Y-%m-%d"))
         except:
             pass
 
-    if not dates:
+    if not all_dates:
         return {"labels": [], "baseline": [], "scheduled": [], "earned": [], "project": parent_task_name}
 
-    min_date = min(dates)
-    max_date = max(dates)
+    min_date = min(all_dates)
+    max_date = max(all_dates)
     today = datetime.now()
 
-    # Build weekly timeline
+    # Weekly timeline
     timeline = []
     current = min_date
     while current <= max_date:
         timeline.append(current)
         current += timedelta(days=7)
-    if max_date not in timeline:
+    if not timeline or timeline[-1] < max_date:
         timeline.append(max_date)
 
-    # Calculate totals
-    total_baseline = sum(t.get("baseline_hours", 0) or 0 for t in project_tasks)
-    total_scheduled = sum(t.get("work_hours", 0) or 0 for t in project_tasks)
-    total_earned = sum((t.get("baseline_hours", 0) or 0) * (t.get("percent_complete", 0) or 0) / 100.0 for t in project_tasks)
-
-    n_points = len(timeline)
+    # Build cumulative data
     labels = []
     baseline_data = []
     scheduled_data = []
     earned_data = []
-
-    for i, date in enumerate(timeline):
-        labels.append(date.strftime("%b %d"))
+    
+    for point_date in timeline:
+        labels.append(point_date.strftime("%b %d"))
         
-        # S-curve shape
-        progress = (i + 1) / n_points
-        s_factor = 3 * progress**2 - 2 * progress**3
+        baseline_cum = 0
+        scheduled_cum = 0
+        earned_cum = 0
         
-        baseline_data.append(round(total_baseline * s_factor, 1))
-        scheduled_data.append(round(total_scheduled * s_factor, 1))
+        for t in project_tasks:
+            try:
+                start = datetime.strptime(t["start_date"], "%Y-%m-%d")
+                finish = datetime.strptime(t["finish_date"], "%Y-%m-%d")
+                
+                baseline_hours = float(t.get("baseline_hours", 0) or 0)
+                work_hours = float(t.get("work_hours", 0) or 0)
+                percent = float(t.get("percent_complete", 0) or 0) / 100.0
+                earned_value = baseline_hours * percent
+                
+                if point_date < start:
+                    continue
+                elif point_date >= finish:
+                    baseline_cum += baseline_hours
+                    scheduled_cum += work_hours
+                    if point_date <= today:
+                        earned_cum += earned_value
+                else:
+                    duration = (finish - start).days or 1
+                    elapsed = (point_date - start).days
+                    portion = elapsed / duration
+                    
+                    baseline_cum += baseline_hours * portion
+                    scheduled_cum += work_hours * portion
+                    if point_date <= today:
+                        earned_cum += earned_value * portion
+                        
+            except Exception:
+                continue
         
-        # Earned value up to today
-        if date <= today:
-            avg_complete = sum(t.get("percent_complete", 0) or 0 for t in project_tasks) / max(1, len(project_tasks))
-            earned_data.append(round(total_earned * (i + 1) / n_points, 1))
-        else:
-            earned_data.append(earned_data[-1] if earned_data else 0)
+        baseline_data.append(round(baseline_cum, 1))
+        scheduled_data.append(round(scheduled_cum, 1))
+        earned_data.append(round(earned_cum, 1))
 
     return {
         "labels": labels,
