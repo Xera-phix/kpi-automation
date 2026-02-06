@@ -100,12 +100,13 @@ def detect_phase_adjustment(query: str, tasks: list) -> dict:
         hours_match = re.search(r"add\s+(\d+)\s*(?:hours?|hrs?|h)?", query_lower)
     if not hours_match:
         hours_match = re.search(r"(\d+)\s*(?:hours?|hrs?|h)", query_lower)
-    
+
     hours_delta = float(hours_match.group(1)) if hours_match else None
 
     # Check if this is an "add hours" type request
     is_add_hours_request = hours_delta is not None and any(
-        kw in query_lower for kw in ["add", "more", "longer", "extra", "additional", "increase", "taking"]
+        kw in query_lower
+        for kw in ["add", "more", "longer", "extra", "additional", "increase", "taking"]
     )
 
     task_match = None
@@ -118,9 +119,10 @@ def detect_phase_adjustment(query: str, tasks: list) -> dict:
     # 1. Phase specified + hours + task found (existing behavior)
     # 2. OR hours being added but NO phase specified (need to ask which phase)
     needs_phase_clarification = (
-        (detected_phase is not None and hours_delta is not None and task_match is not None)
-        or (is_add_hours_request and task_match is not None and detected_phase is None)
-    )
+        detected_phase is not None
+        and hours_delta is not None
+        and task_match is not None
+    ) or (is_add_hours_request and task_match is not None and detected_phase is None)
 
     return {
         "phase": detected_phase,
@@ -199,18 +201,22 @@ def create_phase_selection_options(task: dict, hours_delta: float) -> list:
     """Create options when user didn't specify which phase to add hours to."""
     current_total = task["work_hours"]
     new_total = current_total + hours_delta
-    
+
     current_dev = task.get("dev_hours", 0)
     current_test = task.get("test_hours", 0)
     current_review = task.get("review_hours", 0)
-    
+
     options = [
         {
             "option": 1,
             "label": f"Add to Development (+{hours_delta}h)",
             "description": f"Dev: {current_dev}h → {current_dev + hours_delta}h | Total: {current_total}h → {new_total}h",
             "changes": [
-                {"id": task["id"], "field": "dev_hours", "value": current_dev + hours_delta},
+                {
+                    "id": task["id"],
+                    "field": "dev_hours",
+                    "value": current_dev + hours_delta,
+                },
                 {"id": task["id"], "field": "work_hours", "value": new_total},
             ],
         },
@@ -219,7 +225,11 @@ def create_phase_selection_options(task: dict, hours_delta: float) -> list:
             "label": f"Add to Testing (+{hours_delta}h)",
             "description": f"Test: {current_test}h → {current_test + hours_delta}h | Total: {current_total}h → {new_total}h",
             "changes": [
-                {"id": task["id"], "field": "test_hours", "value": current_test + hours_delta},
+                {
+                    "id": task["id"],
+                    "field": "test_hours",
+                    "value": current_test + hours_delta,
+                },
                 {"id": task["id"], "field": "work_hours", "value": new_total},
             ],
         },
@@ -228,7 +238,11 @@ def create_phase_selection_options(task: dict, hours_delta: float) -> list:
             "label": f"Add to Review (+{hours_delta}h)",
             "description": f"Review: {current_review}h → {current_review + hours_delta}h | Total: {current_total}h → {new_total}h",
             "changes": [
-                {"id": task["id"], "field": "review_hours", "value": current_review + hours_delta},
+                {
+                    "id": task["id"],
+                    "field": "review_hours",
+                    "value": current_review + hours_delta,
+                },
                 {"id": task["id"], "field": "work_hours", "value": new_total},
             ],
         },
@@ -246,7 +260,7 @@ def create_phase_selection_options(task: dict, hours_delta: float) -> list:
             "changes": [],
         },
     ]
-    
+
     # Calculate scale_all option changes
     if current_total > 0:
         scale_factor = new_total / current_total
@@ -259,8 +273,10 @@ def create_phase_selection_options(task: dict, hours_delta: float) -> list:
             {"id": task["id"], "field": "review_hours", "value": new_review},
             {"id": task["id"], "field": "work_hours", "value": new_total},
         ]
-        options[3]["description"] = f"Dev: {new_dev}h | Test: {new_test}h | Review: {new_review}h"
-    
+        options[3][
+            "description"
+        ] = f"Dev: {new_dev}h | Test: {new_test}h | Review: {new_review}h"
+
     return options
 
 

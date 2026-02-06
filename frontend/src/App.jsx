@@ -194,27 +194,38 @@ function App() {
   // Get parent tasks (projects) for S-curve dropdown
   const parentTasks = tasks.filter(t => !t.parent_task && tasks.some(st => st.parent_task === t.task))
 
-  // S-Curve chart config (main)
+  // S-Curve chart config (main) - now with 3 lines
   const chartData = {
-    labels: scurveData.labels,
+    labels: scurveData.labels || [],
     datasets: [
       {
-        label: 'Baseline',
-        data: scurveData.baseline,
+        label: 'Baseline (Planned)',
+        data: scurveData.baseline || [],
         borderColor: '#9ca3af',
         borderDash: [5, 5],
         borderWidth: 2,
         pointRadius: 0,
-        fill: false
+        fill: false,
+        tension: 0.4
       },
       {
-        label: 'Actual',
-        data: scurveData.actual,
+        label: 'Scheduled (Current)',
+        data: scurveData.scheduled || scurveData.actual || [],
         borderColor: '#3b82f6',
         borderWidth: 2,
         pointRadius: 0,
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        fill: true
+        fill: true,
+        tension: 0.4
+      },
+      {
+        label: 'Earned Value',
+        data: scurveData.earned || [],
+        borderColor: '#10b981',
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: false,
+        tension: 0.4
       }
     ]
   }
@@ -241,25 +252,28 @@ function App() {
     interaction: { mode: 'nearest', axis: 'x', intersect: false }
   }
 
-  // Resource workload bar chart - MS Project style (Capacity vs Allocation)
+  // Resource workload bar chart - All bars same max length (100% = capacity)
+  // Convert to percentages so all bars are comparable
+  const maxCapacity = Math.max(...resourceAllocation.map(r => r.capacity), 1)
+  
   const resourceChartData = {
     labels: resourceAllocation.map(r => r.name),
     datasets: [
       {
         label: 'Completed',
-        data: resourceAllocation.map(r => r.completed),
+        data: resourceAllocation.map(r => (r.completed / maxCapacity) * 100),
         backgroundColor: '#10b981',
         borderRadius: 4
       },
       {
         label: 'Remaining',
-        data: resourceAllocation.map(r => r.remaining),
+        data: resourceAllocation.map(r => (r.remaining / maxCapacity) * 100),
         backgroundColor: '#3b82f6',
         borderRadius: 4
       },
       {
         label: 'Available',
-        data: resourceAllocation.map(r => r.available),
+        data: resourceAllocation.map(r => (r.available / maxCapacity) * 100),
         backgroundColor: 'rgba(156, 163, 175, 0.3)',
         borderRadius: 4
       }
@@ -274,11 +288,22 @@ function App() {
       legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } },
       tooltip: {
         callbacks: {
+          label: (context) => {
+            const idx = context.dataIndex
+            const r = resourceAllocation[idx]
+            if (!r) return ''
+            const datasetLabel = context.dataset.label
+            if (datasetLabel === 'Completed') return `Completed: ${r.completed}h`
+            if (datasetLabel === 'Remaining') return `Remaining: ${r.remaining}h`
+            if (datasetLabel === 'Available') return `Available: ${r.available}h`
+            return ''
+          },
           afterBody: (context) => {
             const idx = context[0].dataIndex
             const r = resourceAllocation[idx]
             if (r) {
               return [
+                `───────────`,
                 `Utilization: ${r.utilization}%`,
                 `Capacity: ${r.capacity}h`,
                 r.overallocated ? '⚠️ OVERALLOCATED' : ''
@@ -290,7 +315,13 @@ function App() {
       }
     },
     scales: {
-      x: { stacked: true, grid: { display: false }, title: { display: true, text: 'Hours' } },
+      x: { 
+        stacked: true, 
+        grid: { display: false }, 
+        max: 100,
+        title: { display: true, text: '% of Capacity' },
+        ticks: { callback: (value) => value + '%' }
+      },
       y: { stacked: true, grid: { display: false } }
     }
   }
@@ -500,7 +531,8 @@ function App() {
                       labels: projectScurve.labels,
                       datasets: [
                         { ...chartData.datasets[0], data: projectScurve.baseline },
-                        { ...chartData.datasets[1], data: projectScurve.actual }
+                        { ...chartData.datasets[1], data: projectScurve.scheduled || projectScurve.actual },
+                        { ...chartData.datasets[2], data: projectScurve.earned }
                       ]
                     } : chartData} 
                     options={fullScurveOptions} 

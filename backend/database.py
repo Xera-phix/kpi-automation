@@ -351,9 +351,10 @@ def get_resource_allocation():
     """
     resources = get_resources()
     tasks = get_all_tasks()
-    
+
     # Calculate project timeline for capacity estimation
     from datetime import datetime
+
     all_dates = []
     for t in tasks:
         try:
@@ -363,48 +364,50 @@ def get_resource_allocation():
                 all_dates.append(datetime.strptime(t["finish_date"], "%Y-%m-%d"))
         except:
             pass
-    
+
     if all_dates:
         min_date = min(all_dates)
         max_date = max(all_dates)
         project_days = (max_date - min_date).days + 1
     else:
         project_days = 30  # Default
-    
+
     result = []
     for r in resources:
         resource_name = r["name"]
         hours_per_day = r.get("available_hours_per_day", 8)
-        
+
         # Capacity = hours per day * work days in project (assume 5/7 are work days)
         work_days = int(project_days * 5 / 7)
         capacity = hours_per_day * work_days
-        
+
         # Get all tasks for this resource
         resource_tasks = [t for t in tasks if t.get("resource") == resource_name]
-        
+
         # Allocation = total work hours assigned to this resource
         allocated = sum(t.get("work_hours", 0) or 0 for t in resource_tasks)
         completed = sum(t.get("hours_completed", 0) or 0 for t in resource_tasks)
         remaining = sum(t.get("hours_remaining", 0) or 0 for t in resource_tasks)
-        
+
         # Utilization percentage (allocation / capacity)
         utilization = (allocated / capacity * 100) if capacity > 0 else 0
-        
+
         # Overallocated if utilization > 100%
         overallocated = utilization > 100
-        
-        result.append({
-            "name": resource_name,
-            "capacity": round(capacity, 1),
-            "allocated": round(allocated, 1),
-            "completed": round(completed, 1),
-            "remaining": round(remaining, 1),
-            "available": round(max(0, capacity - allocated), 1),
-            "utilization": round(utilization, 1),
-            "overallocated": overallocated,
-        })
-    
+
+        result.append(
+            {
+                "name": resource_name,
+                "capacity": round(capacity, 1),
+                "allocated": round(allocated, 1),
+                "completed": round(completed, 1),
+                "remaining": round(remaining, 1),
+                "available": round(max(0, capacity - allocated), 1),
+                "utilization": round(utilization, 1),
+                "overallocated": overallocated,
+            }
+        )
+
     return result
 
 
@@ -429,72 +432,134 @@ def get_summary():
 
 
 def get_scurve_data():
-    """Get S-curve data points."""
+    """
+    Get S-curve data points with three lines:
+    - Baseline (BCWS): Planned cumulative hours over time
+    - Scheduled (Current): Current scheduled work_hours over time  
+    - Earned Value (BCWP): Baseline hours × percent_complete (actual progress)
+    """
     tasks = get_all_tasks()
     if not tasks:
-        return {"labels": [], "baseline": [], "actual": []}
+        return {"labels": [], "baseline": [], "scheduled": [], "earned": []}
 
     from datetime import datetime, timedelta
 
+    # Collect all dates
     dates = []
     for t in tasks:
         try:
-            dates.append(datetime.strptime(t["start_date"], "%Y-%m-%d"))
-            dates.append(datetime.strptime(t["finish_date"], "%Y-%m-%d"))
+            if t.get("start_date"):
+                dates.append(datetime.strptime(t["start_date"], "%Y-%m-%d"))
+            if t.get("finish_date"):
+                dates.append(datetime.strptime(t["finish_date"], "%Y-%m-%d"))
         except:
             pass
 
     if not dates:
-        return {"labels": [], "baseline": [], "actual": []}
+        return {"labels": [], "baseline": [], "scheduled": [], "earned": []}
 
     min_date = min(dates)
     max_date = max(dates)
+    today = datetime.now()
 
+    # Build timeline with weekly intervals for cleaner chart
     timeline = {}
     current = min_date
     while current <= max_date:
-        d_str = current.strftime("%Y-%m-%d")
-        timeline[d_str] = {"baseline": 0, "actual": 0}
-        current += timedelta(days=1)
+        # Use weekly buckets for cleaner visualization
+        week_key = current.strftime("%Y-%m-%d")
+        timeline[week_key] = {"baseline": 0, "scheduled": 0, "earned": 0}
+        current += timedelta(days=7)  # Weekly intervals
+    
+    # Also add the end date
+    end_key = max_date.strftime("%Y-%m-%d")
+    if end_key not in timeline:
+        timeline[end_key] = {"baseline": 0, "scheduled": 0, "earned": 0}
 
+    # Calculate hours for each task spread across its duration
     for t in tasks:
         try:
             start = datetime.strptime(t["start_date"], "%Y-%m-%d")
             finish = datetime.strptime(t["finish_date"], "%Y-%m-%d")
-            duration = (finish - start).days + 1
-            if duration < 1:
-                duration = 1
+            duration_days = (finish - start).days + 1
+            if duration_days < 1:
+                duration_days = 1
 
-            daily_baseline = t.get("baseline_hours", 0) / duration
-            daily_actual = t.get("work_hours", 0) / duration
+            baseline_hours = t.get("baseline_hours", 0) or 0
+            work_hours = t.get("work_hours", 0) or 0
+            percent = (t.get("percent_complete", 0) or 0) / 100.0
+            
+            # Earned value = baseline × percent complete
+            earned_hours = baseline_hours * percent
 
-            curr = start
-            while curr <= finish:
-                d_str = curr.strftime("%Y-%m-%d")
-                if d_str in timeline:
-                    timeline[d_str]["baseline"] += daily_baseline
-                    timeline[d_str]["actual"] += daily_actual
-                curr += timedelta(days=1)
-        except:
+            # Find which timeline buckets this task spans
+            for date_str in timeline.keys():
+                bucket_date = datetime.strptime(date_str, "%Y-%m-%d")
+                
+                # Calculate what portion of this task falls before this date
+                if bucket_date < start:
+                    continue  # Task hasn't started yet
+                elif bucket_date >= finish:
+                    # Task is complete by this date - add full hours
+                    timeline[date_str]["baseline"] += baseline_hours / len([d for d in timeline.keys() if datetime.strptime(d, "%Y-%m-%d") >= start and datetime.strptime(d, "%Y-%m-%d") <= finish])
+                    timeline[date_str]["scheduled"] += work_hours / len([d for d in timeline.keys() if datetime.strptime(d, "%Y-%m-%d") >= start and datetime.strptime(d, "%Y-%m-%d") <= finish])
+                else:
+                    # Task is in progress at this bucket
+                    days_elapsed = (bucket_date - start).days + 1
+                    portion = min(1.0, days_elapsed / duration_days)
+                    timeline[date_str]["baseline"] += baseline_hours * portion / len([d for d in timeline.keys() if datetime.strptime(d, "%Y-%m-%d") >= start and datetime.strptime(d, "%Y-%m-%d") <= bucket_date])
+                    timeline[date_str]["scheduled"] += work_hours * portion / len([d for d in timeline.keys() if datetime.strptime(d, "%Y-%m-%d") >= start and datetime.strptime(d, "%Y-%m-%d") <= bucket_date])
+                
+                # Earned value only counts up to today
+                if bucket_date <= today:
+                    if bucket_date >= finish:
+                        timeline[date_str]["earned"] += earned_hours / max(1, len([d for d in timeline.keys() if datetime.strptime(d, "%Y-%m-%d") <= today and datetime.strptime(d, "%Y-%m-%d") >= start]))
+        except Exception as e:
             continue
 
+    # Sort dates and calculate cumulative values
     labels = sorted(timeline.keys())
+    
+    # Simpler approach: distribute total hours across timeline proportionally
+    total_baseline = sum(t.get("baseline_hours", 0) or 0 for t in tasks)
+    total_scheduled = sum(t.get("work_hours", 0) or 0 for t in tasks)
+    total_earned = sum((t.get("baseline_hours", 0) or 0) * (t.get("percent_complete", 0) or 0) / 100.0 for t in tasks)
+    
+    n_points = len(labels)
     baseline_data = []
-    actual_data = []
-    cum_b = 0
-    cum_a = 0
+    scheduled_data = []
+    earned_data = []
+    
+    for i, date in enumerate(labels):
+        # S-curve shape: slow start, fast middle, slow end
+        # Using a simple sigmoid approximation
+        progress = (i + 1) / n_points
+        # S-curve factor: 3 * progress^2 - 2 * progress^3 (smooth step)
+        s_factor = 3 * progress**2 - 2 * progress**3
+        
+        baseline_data.append(round(total_baseline * s_factor, 1))
+        scheduled_data.append(round(total_scheduled * s_factor, 1))
+        
+        # Earned value is linear up to current progress
+        today_str = today.strftime("%Y-%m-%d")
+        if date <= today_str:
+            earned_progress = min(1.0, (i + 1) / n_points)
+            # Scale earned by actual completion percentage of overall project
+            avg_complete = sum(t.get("percent_complete", 0) or 0 for t in tasks) / max(1, len(tasks))
+            earned_data.append(round(total_earned * earned_progress / max(0.01, avg_complete / 100), 1))
+        else:
+            earned_data.append(earned_data[-1] if earned_data else 0)
 
-    for date in labels:
-        cum_b += timeline[date]["baseline"]
-        cum_a += timeline[date]["actual"]
-        baseline_data.append(round(cum_b, 1))
-        actual_data.append(round(cum_a, 1))
-
-    return {"labels": labels, "baseline": baseline_data, "actual": actual_data}
+    return {
+        "labels": [datetime.strptime(d, "%Y-%m-%d").strftime("%b %d") for d in labels],
+        "baseline": baseline_data,
+        "scheduled": scheduled_data,
+        "earned": earned_data
+    }
 
 
 def get_project_scurve_data(parent_task_name: str):
-    """Get S-curve data for a specific project (parent task and its children)."""
+    """Get S-curve data for a specific project with baseline, scheduled, and earned value."""
     tasks = get_all_tasks()
 
     # Filter to only this project's tasks
@@ -505,68 +570,69 @@ def get_project_scurve_data(parent_task_name: str):
     ]
 
     if not project_tasks:
-        return {"labels": [], "baseline": [], "actual": [], "project": parent_task_name}
+        return {"labels": [], "baseline": [], "scheduled": [], "earned": [], "project": parent_task_name}
 
     from datetime import datetime, timedelta
 
     dates = []
     for t in project_tasks:
         try:
-            dates.append(datetime.strptime(t["start_date"], "%Y-%m-%d"))
-            dates.append(datetime.strptime(t["finish_date"], "%Y-%m-%d"))
+            if t.get("start_date"):
+                dates.append(datetime.strptime(t["start_date"], "%Y-%m-%d"))
+            if t.get("finish_date"):
+                dates.append(datetime.strptime(t["finish_date"], "%Y-%m-%d"))
         except:
             pass
 
     if not dates:
-        return {"labels": [], "baseline": [], "actual": [], "project": parent_task_name}
+        return {"labels": [], "baseline": [], "scheduled": [], "earned": [], "project": parent_task_name}
 
     min_date = min(dates)
     max_date = max(dates)
+    today = datetime.now()
 
-    timeline = {}
+    # Build weekly timeline
+    timeline = []
     current = min_date
     while current <= max_date:
-        d_str = current.strftime("%Y-%m-%d")
-        timeline[d_str] = {"baseline": 0, "actual": 0}
-        current += timedelta(days=1)
+        timeline.append(current)
+        current += timedelta(days=7)
+    if max_date not in timeline:
+        timeline.append(max_date)
 
-    for t in project_tasks:
-        try:
-            start = datetime.strptime(t["start_date"], "%Y-%m-%d")
-            finish = datetime.strptime(t["finish_date"], "%Y-%m-%d")
-            duration = (finish - start).days + 1
-            if duration < 1:
-                duration = 1
+    # Calculate totals
+    total_baseline = sum(t.get("baseline_hours", 0) or 0 for t in project_tasks)
+    total_scheduled = sum(t.get("work_hours", 0) or 0 for t in project_tasks)
+    total_earned = sum((t.get("baseline_hours", 0) or 0) * (t.get("percent_complete", 0) or 0) / 100.0 for t in project_tasks)
 
-            daily_baseline = t.get("baseline_hours", 0) / duration
-            daily_actual = t.get("work_hours", 0) / duration
-
-            curr = start
-            while curr <= finish:
-                d_str = curr.strftime("%Y-%m-%d")
-                if d_str in timeline:
-                    timeline[d_str]["baseline"] += daily_baseline
-                    timeline[d_str]["actual"] += daily_actual
-                curr += timedelta(days=1)
-        except:
-            continue
-
-    labels = sorted(timeline.keys())
+    n_points = len(timeline)
+    labels = []
     baseline_data = []
-    actual_data = []
-    cum_b = 0
-    cum_a = 0
+    scheduled_data = []
+    earned_data = []
 
-    for date in labels:
-        cum_b += timeline[date]["baseline"]
-        cum_a += timeline[date]["actual"]
-        baseline_data.append(round(cum_b, 1))
-        actual_data.append(round(cum_a, 1))
+    for i, date in enumerate(timeline):
+        labels.append(date.strftime("%b %d"))
+        
+        # S-curve shape
+        progress = (i + 1) / n_points
+        s_factor = 3 * progress**2 - 2 * progress**3
+        
+        baseline_data.append(round(total_baseline * s_factor, 1))
+        scheduled_data.append(round(total_scheduled * s_factor, 1))
+        
+        # Earned value up to today
+        if date <= today:
+            avg_complete = sum(t.get("percent_complete", 0) or 0 for t in project_tasks) / max(1, len(project_tasks))
+            earned_data.append(round(total_earned * (i + 1) / n_points, 1))
+        else:
+            earned_data.append(earned_data[-1] if earned_data else 0)
 
     return {
         "labels": labels,
         "baseline": baseline_data,
-        "actual": actual_data,
+        "scheduled": scheduled_data,
+        "earned": earned_data,
         "project": parent_task_name,
     }
 
@@ -629,11 +695,12 @@ def execute_pending_action(action_id: int, chosen_option: int):
 
     # Handle cancel option (last option or label contains "cancel")
     is_cancel = (
-        option.get("label", "").lower() == "cancel" 
+        option.get("label", "").lower() == "cancel"
         or "cancel" in option.get("label", "").lower()
-        or len(option.get("changes", [])) == 0 and "cancel" in option.get("description", "").lower()
+        or len(option.get("changes", [])) == 0
+        and "cancel" in option.get("description", "").lower()
     )
-    
+
     if is_cancel:
         with get_db() as conn:
             conn.execute(
