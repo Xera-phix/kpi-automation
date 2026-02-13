@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 
 const API = '/api'
-const cn = (...classes) => classes.filter(Boolean).join(' ')
+import { cn } from '@/lib/utils'
 
 // Date helpers
 const parseDate = (dateStr) => {
@@ -224,41 +224,41 @@ export default function TimelinePage() {
 
   // Labor forecast heatmap colors
   const getLoadColor = (hours, capacity = 160) => {
-    if (hours === 0) return 'bg-gray-50 text-gray-300'
+    if (hours === 0) return 'bg-white/[0.03] text-white/20'
     const ratio = hours / capacity
-    if (ratio <= 0.5) return 'bg-green-100 text-green-800'
-    if (ratio <= 0.8) return 'bg-green-200 text-green-900'
-    if (ratio <= 1.0) return 'bg-amber-200 text-amber-900'
-    return 'bg-red-300 text-red-900 font-bold'
+    if (ratio <= 0.5) return 'bg-green-500/15 text-green-400'
+    if (ratio <= 0.8) return 'bg-green-500/25 text-green-300'
+    if (ratio <= 1.0) return 'bg-amber-500/20 text-amber-400'
+    return 'bg-red-500/25 text-red-400 font-bold'
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex flex-col">
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
       {/* Header */}
-      <header className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 text-white shadow-lg shrink-0">
+      <header className="bg-[#11111198] backdrop-blur-xl border-b border-white/[0.08] text-white shrink-0">
         <div className="max-w-[1920px] mx-auto px-6 py-3 flex items-center gap-4">
           <Link to="/" className="p-2 hover:bg-white/10 rounded-lg transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-indigo-200" />
+            <Calendar className="w-5 h-5 text-white/40" />
             <h1 className="text-lg font-semibold">Timeline & Gantt</h1>
-            <span className="ml-2 px-2 py-0.5 bg-amber-400/20 text-amber-200 text-xs rounded-full font-medium">POC</span>
+            <span className="ml-2 px-2 py-0.5 bg-amber-400/20 text-amber-300 text-xs rounded-full font-medium">POC</span>
           </div>
 
           <div className="flex items-center gap-3 ml-auto">
             {/* Group By Toggle */}
-            <div className="flex bg-white/10 rounded-lg p-0.5">
+            <div className="flex bg-white/[0.06] rounded-lg p-0.5">
               <button
                 className={cn("px-3 py-1.5 text-xs rounded-md transition-all font-medium",
-                  groupBy === 'hierarchy' ? "bg-white text-indigo-700" : "text-white/70 hover:text-white")}
+                  groupBy === 'hierarchy' ? "bg-white/15 text-white" : "text-white/50 hover:text-white")}
                 onClick={() => setGroupBy('hierarchy')}
               >
                 <Layers className="w-3 h-3 inline mr-1" /> Hierarchy
               </button>
               <button
                 className={cn("px-3 py-1.5 text-xs rounded-md transition-all font-medium",
-                  groupBy === 'resource' ? "bg-white text-indigo-700" : "text-white/70 hover:text-white")}
+                  groupBy === 'resource' ? "bg-white/15 text-white" : "text-white/50 hover:text-white")}
                 onClick={() => setGroupBy('resource')}
               >
                 <Users className="w-3 h-3 inline mr-1" /> Resource
@@ -266,7 +266,7 @@ export default function TimelinePage() {
             </div>
 
             {/* Zoom Controls */}
-            <div className="flex items-center gap-1 bg-white/10 rounded-lg p-0.5">
+            <div className="flex items-center gap-1 bg-white/[0.06] rounded-lg p-0.5">
               <button
                 className="p-1.5 hover:bg-white/10 rounded-md transition-colors disabled:opacity-30"
                 onClick={() => setZoomIdx(Math.max(0, zoomIdx - 1))}
@@ -297,16 +297,16 @@ export default function TimelinePage() {
 
       {/* Milestone Form */}
       {showMilestoneForm && (
-        <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-3">
+        <div className="bg-[#111111] border-b border-white/[0.06] px-6 py-3 flex items-center gap-3">
           <input
-            className="px-3 py-1.5 border rounded-lg text-sm w-48"
+            className="px-3 py-1.5 bg-white/[0.06] border border-white/10 rounded-lg text-sm text-white w-48 placeholder-white/30"
             placeholder="Milestone name"
             value={newMs.name}
             onChange={e => setNewMs({ ...newMs, name: e.target.value })}
           />
           <input
             type="date"
-            className="px-3 py-1.5 border rounded-lg text-sm"
+            className="px-3 py-1.5 bg-white/[0.06] border border-white/10 rounded-lg text-sm text-white"
             value={newMs.date}
             onChange={e => setNewMs({ ...newMs, date: e.target.value })}
           />
@@ -316,16 +316,16 @@ export default function TimelinePage() {
             value={newMs.color}
             onChange={e => setNewMs({ ...newMs, color: e.target.value })}
           />
-          <button className="px-3 py-1.5 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600" onClick={addMilestone}>Add</button>
-          <button className="p-1.5 hover:bg-gray-100 rounded-lg" onClick={() => setShowMilestoneForm(false)}><X className="w-4 h-4" /></button>
+          <button className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600" onClick={addMilestone}>Add</button>
+          <button className="p-1.5 hover:bg-white/10 rounded-lg text-white/50" onClick={() => setShowMilestoneForm(false)}><X className="w-4 h-4" /></button>
 
           {milestones.length > 0 && (
             <div className="flex items-center gap-2 ml-4 pl-4 border-l">
               {milestones.map(ms => (
-                <span key={ms.id} className="flex items-center gap-1 text-xs bg-slate-100 px-2 py-1 rounded-full">
+                <span key={ms.id} className="flex items-center gap-1 text-xs bg-white/[0.06] text-white/60 px-2 py-1 rounded-full">
                   <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: ms.color, transform: 'rotate(45deg)' }} />
                   {ms.name}
-                  <button className="hover:text-red-500 ml-0.5" onClick={() => removeMilestone(ms.id)}><X className="w-3 h-3" /></button>
+                  <button className="hover:text-red-400 ml-0.5" onClick={() => removeMilestone(ms.id)}><X className="w-3 h-3" /></button>
                 </span>
               ))}
             </div>
@@ -336,9 +336,9 @@ export default function TimelinePage() {
       {/* Main Gantt Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - Task List */}
-        <div className="w-80 bg-white border-r border-slate-200 flex flex-col shrink-0">
+        <div className="w-80 bg-[#111111] border-r border-white/[0.06] flex flex-col shrink-0">
           {/* Header */}
-          <div className="flex items-center bg-slate-50 border-b border-slate-200 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider" style={{ height: HEADER_HEIGHT }}>
+          <div className="flex items-center bg-white/[0.03] border-b border-white/[0.06] px-3 text-xs font-semibold text-white/40 uppercase tracking-wider" style={{ height: HEADER_HEIGHT }}>
             <span className="flex-1">Task</span>
             <span className="w-16 text-right">Work</span>
             <span className="w-12 text-right">%</span>
@@ -348,7 +348,7 @@ export default function TimelinePage() {
             {displayTasks.map((task, i) => {
               if (task._isSwimlane) {
                 return (
-                  <div key={`swim-${task._label}`} className="flex items-center px-3 bg-indigo-50 border-b border-indigo-100 font-semibold text-indigo-700 text-xs uppercase tracking-wider" style={{ height: ROW_HEIGHT }}>
+                  <div key={`swim-${task._label}`} className="flex items-center px-3 bg-blue-500/10 border-b border-blue-500/10 font-semibold text-blue-400 text-xs uppercase tracking-wider" style={{ height: ROW_HEIGHT }}>
                     <Users className="w-3 h-3 mr-2" />
                     {task._label} ({task._count})
                   </div>
@@ -358,25 +358,25 @@ export default function TimelinePage() {
                 <div
                   key={task.id}
                   className={cn(
-                    "flex items-center px-3 border-b border-slate-100 text-sm hover:bg-blue-50/50 transition-colors",
-                    task._isParent && "bg-slate-50/70"
+                    "flex items-center px-3 border-b border-white/[0.04] text-sm hover:bg-white/[0.04] transition-colors",
+                    task._isParent && "bg-white/[0.03]"
                   )}
                   style={{ height: ROW_HEIGHT }}
                 >
                   <div className="flex-1 flex items-center gap-1 truncate" style={{ paddingLeft: task._depth ? 16 : 0 }}>
                     {task._isParent && (
-                      <button className="p-0.5 hover:bg-slate-200 rounded" onClick={() => toggleParent(task.task)}>
+                      <button className="p-0.5 hover:bg-white/10 rounded" onClick={() => toggleParent(task.task)}>
                         {collapsedParents.has(task.task) ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                       </button>
                     )}
-                    {task._depth > 0 && <span className="text-slate-300 text-xs mr-0.5">└</span>}
-                    <span className={cn("truncate", task._isParent ? "font-semibold text-slate-800" : "text-slate-600")} title={task.task}>
+                    {task._depth > 0 && <span className="text-white/20 text-xs mr-0.5">└</span>}
+                    <span className={cn("truncate", task._isParent ? "font-semibold text-white" : "text-white/60")} title={task.task}>
                       {task.task}
                     </span>
                   </div>
-                  <span className="w-16 text-right text-xs text-slate-500">{Math.round(task.work_hours || 0)}</span>
+                  <span className="w-16 text-right text-xs text-white/40">{Math.round(task.work_hours || 0)}</span>
                   <span className={cn("w-12 text-right text-xs font-medium",
-                    (task.percent_complete || 0) >= 100 ? "text-green-600" : "text-slate-500"
+                    (task.percent_complete || 0) >= 100 ? "text-green-400" : "text-white/40"
                   )}>
                     {task.percent_complete || 0}%
                   </span>
@@ -390,19 +390,19 @@ export default function TimelinePage() {
         <div className="flex-1 overflow-x-auto overflow-y-auto" ref={scrollRef} onScroll={handleScroll}>
           <div style={{ width: totalWidth, minWidth: '100%' }}>
             {/* Month Headers */}
-            <div className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200" style={{ height: HEADER_HEIGHT }}>
+            <div className="sticky top-0 z-10 bg-[#111111] border-b border-white/[0.06]" style={{ height: HEADER_HEIGHT }}>
               <div className="relative h-full">
                 {months.map((m, i) => (
                   <div
                     key={i}
                     className={cn(
-                      "absolute top-0 h-full border-r border-slate-200 flex items-end pb-2 px-2",
-                      m.isCurrentMonth && "bg-blue-50"
+                      "absolute top-0 h-full border-r border-white/[0.06] flex items-end pb-2 px-2",
+                      m.isCurrentMonth && "bg-blue-500/10"
                     )}
                     style={{ left: m.offset * zoom.dayWidth, width: m.width * zoom.dayWidth }}
                   >
                     <span className={cn("text-xs font-medium whitespace-nowrap",
-                      m.isCurrentMonth ? "text-blue-600" : "text-slate-500"
+                      m.isCurrentMonth ? "text-blue-400" : "text-white/40"
                     )}>
                       {m.label}
                     </span>
@@ -436,7 +436,7 @@ export default function TimelinePage() {
                   y1={0}
                   x2={m.offset * zoom.dayWidth}
                   y2={displayTasks.length * ROW_HEIGHT + 20}
-                  stroke="#e2e8f0"
+                  stroke="rgba(255,255,255,0.06)"
                   strokeWidth="1"
                 />
               ))}
@@ -487,7 +487,7 @@ export default function TimelinePage() {
                       key={`swim-${i}`}
                       x={0} y={i * ROW_HEIGHT}
                       width={totalWidth} height={ROW_HEIGHT}
-                      fill="#eef2ff"
+                      fill="rgba(59,130,246,0.08)"
                       opacity="0.5"
                     />
                   )
@@ -559,7 +559,7 @@ export default function TimelinePage() {
                     {task.resource && bar.width < 200 && (
                       <text
                         x={bar.x + bar.width + 6} y={yCenter + 4}
-                        fill="#94a3b8"
+                        fill="rgba(148,163,184,0.5)"
                         fontSize="9"
                         className="pointer-events-none"
                       >
@@ -605,15 +605,15 @@ export default function TimelinePage() {
       </div>
 
       {/* Labor Forecast Heatmap */}
-      <div className="shrink-0 border-t border-slate-200 bg-white">
+      <div className="shrink-0 border-t border-white/[0.06] bg-[#111111]">
         <button
-          className="w-full px-6 py-2.5 flex items-center gap-2 hover:bg-slate-50 transition-colors"
+          className="w-full px-6 py-2.5 flex items-center gap-2 hover:bg-white/[0.04] transition-colors"
           onClick={() => setShowForecast(!showForecast)}
         >
-          <TrendingUp className="w-4 h-4 text-indigo-500" />
-          <span className="text-sm font-semibold text-slate-700">12-Month Labor Forecast</span>
-          <span className="text-xs text-slate-400 ml-2">hrs/person/month • capacity: 160h</span>
-          {showForecast ? <ChevronDown className="w-4 h-4 text-slate-400 ml-auto" /> : <ChevronRight className="w-4 h-4 text-slate-400 ml-auto" />}
+          <TrendingUp className="w-4 h-4 text-blue-400" />
+          <span className="text-sm font-semibold text-white">12-Month Labor Forecast</span>
+          <span className="text-xs text-white/30 ml-2">hrs/person/month • capacity: 160h</span>
+          {showForecast ? <ChevronDown className="w-4 h-4 text-white/30 ml-auto" /> : <ChevronRight className="w-4 h-4 text-white/30 ml-auto" />}
         </button>
 
         {showForecast && forecast && (
@@ -621,40 +621,40 @@ export default function TimelinePage() {
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr>
-                  <th className="text-left py-2 px-3 text-slate-500 font-semibold bg-slate-50 rounded-tl-lg sticky left-0 z-10 w-32">Resource</th>
+                  <th className="text-left py-2 px-3 text-white/40 font-semibold bg-white/[0.03] rounded-tl-lg sticky left-0 z-10 w-32">Resource</th>
                   {forecast.months.map((m, i) => (
-                    <th key={i} className="py-2 px-2 text-center text-slate-500 font-medium bg-slate-50 whitespace-nowrap min-w-[64px]">{m}</th>
+                    <th key={i} className="py-2 px-2 text-center text-white/40 font-medium bg-white/[0.03] whitespace-nowrap min-w-[64px]">{m}</th>
                   ))}
-                  <th className="py-2 px-3 text-right text-slate-500 font-semibold bg-slate-50 rounded-tr-lg">Total</th>
+                  <th className="py-2 px-3 text-right text-white/40 font-semibold bg-white/[0.03] rounded-tr-lg">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {Object.entries(forecast.forecast).map(([resource, hours]) => {
                   const total = hours.reduce((a, b) => a + b, 0)
                   return (
-                    <tr key={resource} className="border-b border-slate-100 last:border-0">
-                      <td className="py-1.5 px-3 font-medium text-slate-700 sticky left-0 bg-white z-10">{resource}</td>
+                    <tr key={resource} className="border-b border-white/[0.04] last:border-0">
+                      <td className="py-1.5 px-3 font-medium text-white/70 sticky left-0 bg-[#111111] z-10">{resource}</td>
                       {hours.map((h, i) => (
                         <td key={i} className={cn("py-1.5 px-2 text-center rounded-sm", getLoadColor(h, forecast.capacity_per_month))}>
                           {h > 0 ? Math.round(h) : '–'}
                         </td>
                       ))}
-                      <td className="py-1.5 px-3 text-right font-semibold text-slate-700">{Math.round(total)}</td>
+                      <td className="py-1.5 px-3 text-right font-semibold text-white/70">{Math.round(total)}</td>
                     </tr>
                   )
                 })}
                 {/* Total row */}
-                <tr className="bg-slate-50 font-semibold">
-                  <td className="py-1.5 px-3 text-slate-700 sticky left-0 bg-slate-50 z-10">TOTAL</td>
+                <tr className="bg-white/[0.03] font-semibold">
+                  <td className="py-1.5 px-3 text-white/70 sticky left-0 bg-white/[0.03] z-10">TOTAL</td>
                   {forecast.months.map((_, i) => {
                     const monthTotal = Object.values(forecast.forecast).reduce((sum, hours) => sum + (hours[i] || 0), 0)
                     return (
-                      <td key={i} className="py-1.5 px-2 text-center text-slate-700">
+                      <td key={i} className="py-1.5 px-2 text-center text-white/60">
                         {Math.round(monthTotal)}
                       </td>
                     )
                   })}
-                  <td className="py-1.5 px-3 text-right text-slate-800">
+                  <td className="py-1.5 px-3 text-right text-white">
                     {Math.round(Object.values(forecast.forecast).reduce((sum, hours) => sum + hours.reduce((a, b) => a + b, 0), 0))}
                   </td>
                 </tr>
@@ -662,12 +662,12 @@ export default function TimelinePage() {
             </table>
 
             {/* Legend */}
-            <div className="flex items-center gap-4 mt-3 text-xs text-slate-500">
-              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-green-100" /> ≤50%</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-green-200" /> 50-80%</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-amber-200" /> 80-100%</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-red-300" /> Overloaded (&gt;100%)</span>
-              <span className="ml-auto text-slate-400">Capacity: {forecast.capacity_per_month}h/month (8h × 20 days)</span>
+            <div className="flex items-center gap-4 mt-3 text-xs text-white/40">
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-green-500/15" /> ≤50%</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-green-500/25" /> 50-80%</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-amber-500/20" /> 80-100%</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-red-500/25" /> Overloaded (&gt;100%)</span>
+              <span className="ml-auto text-white/30">Capacity: {forecast.capacity_per_month}h/month (8h × 20 days)</span>
             </div>
           </div>
         )}

@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 
 const API = '/api'
-const cn = (...classes) => classes.filter(Boolean).join(' ')
+import { cn } from '@/lib/utils'
 
 export default function DependenciesPage() {
   const [tasks, setTasks] = useState([])
@@ -105,7 +105,7 @@ export default function DependenciesPage() {
   ).slice(0, 8)
 
   const getLoadBarColor = (hours, capacity) => {
-    if (hours === 0) return 'bg-gray-200'
+    if (hours === 0) return 'bg-white/10'
     const ratio = hours / capacity
     if (ratio <= 0.8) return 'bg-green-400'
     if (ratio <= 1.0) return 'bg-amber-400'
@@ -114,29 +114,29 @@ export default function DependenciesPage() {
 
   const getLoadBadge = (hours, capacity) => {
     const ratio = hours / capacity
-    if (ratio <= 0.5) return { text: 'Light', color: 'bg-green-100 text-green-700' }
-    if (ratio <= 0.8) return { text: 'Normal', color: 'bg-blue-100 text-blue-700' }
-    if (ratio <= 1.0) return { text: 'Heavy', color: 'bg-amber-100 text-amber-700' }
-    return { text: 'OVERLOADED', color: 'bg-red-100 text-red-700 font-bold' }
+    if (ratio <= 0.5) return { text: 'Light', color: 'bg-green-500/20 text-green-400' }
+    if (ratio <= 0.8) return { text: 'Normal', color: 'bg-blue-500/20 text-blue-400' }
+    if (ratio <= 1.0) return { text: 'Heavy', color: 'bg-amber-500/20 text-amber-400' }
+    return { text: 'OVERLOADED', color: 'bg-red-500/20 text-red-400 font-bold' }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex flex-col">
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
       {/* Header */}
-      <header className="bg-gradient-to-r from-teal-600 via-teal-700 to-emerald-700 text-white shadow-lg shrink-0">
+      <header className="bg-[#11111198] backdrop-blur-xl border-b border-white/[0.08] text-white shrink-0">
         <div className="max-w-[1920px] mx-auto px-6 py-3 flex items-center gap-4">
           <Link to="/" className="p-2 hover:bg-white/10 rounded-lg transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="flex items-center gap-2">
-            <GitBranch className="w-5 h-5 text-teal-200" />
+            <GitBranch className="w-5 h-5 text-white/40" />
             <h1 className="text-lg font-semibold">Dependencies & Resource Load</h1>
-            <span className="ml-2 px-2 py-0.5 bg-amber-400/20 text-amber-200 text-xs rounded-full font-medium">POC</span>
+            <span className="ml-2 px-2 py-0.5 bg-amber-400/20 text-amber-300 text-xs rounded-full font-medium">POC</span>
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
             {/* Tab Toggle */}
-            <div className="flex bg-white/10 rounded-lg p-0.5">
+            <div className="flex bg-white/[0.06] rounded-lg p-0.5">
               {[
                 { key: 'overview', icon: Shield, label: 'Overview' },
                 { key: 'blockers', icon: GitBranch, label: 'Blockers' },
@@ -145,7 +145,7 @@ export default function DependenciesPage() {
                 <button
                   key={tab.key}
                   className={cn("px-3 py-1.5 text-xs rounded-md transition-all font-medium flex items-center gap-1",
-                    activeTab === tab.key ? "bg-white text-teal-700" : "text-white/70 hover:text-white")}
+                    activeTab === tab.key ? "bg-white/15 text-white" : "text-white/50 hover:text-white")}
                   onClick={() => setActiveTab(tab.key)}
                 >
                   <tab.icon className="w-3 h-3" /> {tab.label}
@@ -164,41 +164,41 @@ export default function DependenciesPage() {
           <div className="space-y-6">
             {/* Stats Cards */}
             <div className="grid grid-cols-4 gap-4">
-              <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+              <div className="bg-[#11111198] backdrop-blur-sm rounded-xl p-5 shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08]">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-teal-50 rounded-lg"><GitBranch className="w-5 h-5 text-teal-500" /></div>
+                  <div className="p-2.5 bg-teal-500/15 rounded-lg"><GitBranch className="w-5 h-5 text-teal-400" /></div>
                   <div>
-                    <div className="text-2xl font-bold text-slate-800">{blockerStats.totalDeps}</div>
-                    <div className="text-xs text-slate-500 uppercase tracking-wide">Dependencies</div>
+                    <div className="text-2xl font-bold text-white">{blockerStats.totalDeps}</div>
+                    <div className="text-xs text-white/40 uppercase tracking-wide">Dependencies</div>
                   </div>
                 </div>
               </div>
-              <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+              <div className="bg-[#11111198] backdrop-blur-sm rounded-xl p-5 shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08]">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-amber-50 rounded-lg"><Shield className="w-5 h-5 text-amber-500" /></div>
+                  <div className="p-2.5 bg-amber-500/15 rounded-lg"><Shield className="w-5 h-5 text-amber-400" /></div>
                   <div>
-                    <div className="text-2xl font-bold text-slate-800">{blockerStats.blockedTasks}</div>
-                    <div className="text-xs text-slate-500 uppercase tracking-wide">Blocked Tasks</div>
+                    <div className="text-2xl font-bold text-white">{blockerStats.blockedTasks}</div>
+                    <div className="text-xs text-white/40 uppercase tracking-wide">Blocked Tasks</div>
                   </div>
                 </div>
               </div>
-              <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+              <div className="bg-[#11111198] backdrop-blur-sm rounded-xl p-5 shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08]">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-red-50 rounded-lg"><AlertTriangle className="w-5 h-5 text-red-500" /></div>
+                  <div className="p-2.5 bg-red-500/15 rounded-lg"><AlertTriangle className="w-5 h-5 text-red-400" /></div>
                   <div>
-                    <div className="text-2xl font-bold text-slate-800">
+                    <div className="text-2xl font-bold text-white">
                       {resources.filter(r => r.overloaded).length}
                     </div>
-                    <div className="text-xs text-slate-500 uppercase tracking-wide">Overloaded People</div>
+                    <div className="text-xs text-white/40 uppercase tracking-wide">Overloaded People</div>
                   </div>
                 </div>
               </div>
-              <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+              <div className="bg-[#11111198] backdrop-blur-sm rounded-xl p-5 shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08]">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-blue-50 rounded-lg"><Users className="w-5 h-5 text-blue-500" /></div>
+                  <div className="p-2.5 bg-blue-500/15 rounded-lg"><Users className="w-5 h-5 text-blue-400" /></div>
                   <div>
-                    <div className="text-2xl font-bold text-slate-800">{resources.length}</div>
-                    <div className="text-xs text-slate-500 uppercase tracking-wide">Team Members</div>
+                    <div className="text-2xl font-bold text-white">{resources.length}</div>
+                    <div className="text-xs text-white/40 uppercase tracking-wide">Team Members</div>
                   </div>
                 </div>
               </div>
@@ -207,56 +207,56 @@ export default function DependenciesPage() {
             {/* Split view: Dependencies + Resource Summary */}
             <div className="grid grid-cols-2 gap-6">
               {/* Dependencies List */}
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-                  <span className="font-semibold text-slate-700 flex items-center gap-2">
-                    <GitBranch className="w-4 h-4 text-teal-500" /> Active Blockers
+              <div className="bg-[#11111198] backdrop-blur-sm rounded-xl shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08] overflow-hidden">
+                <div className="px-5 py-3 border-b border-white/[0.06] flex items-center justify-between">
+                  <span className="font-semibold text-white flex items-center gap-2">
+                    <GitBranch className="w-4 h-4 text-teal-400" /> Active Blockers
                   </span>
                   <button
-                    className="flex items-center gap-1 px-3 py-1 bg-teal-50 text-teal-600 rounded-lg text-xs font-medium hover:bg-teal-100 transition-colors"
+                    className="flex items-center gap-1 px-3 py-1 bg-teal-500/15 text-teal-400 rounded-lg text-xs font-medium hover:bg-teal-500/25 transition-colors"
                     onClick={() => setShowAddDep(true)}
                   >
                     <Plus className="w-3 h-3" /> Add
                   </button>
                 </div>
 
-                <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
+                <div className="divide-y divide-white/[0.04] max-h-[400px] overflow-y-auto">
                   {dependencies.length === 0 ? (
-                    <div className="px-5 py-8 text-center text-slate-400 text-sm">
-                      <GitBranch className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                    <div className="px-5 py-8 text-center text-white/30 text-sm">
+                      <GitBranch className="w-8 h-8 mx-auto mb-2 text-white/10" />
                       No blockers defined yet.<br />
                       <span className="text-xs">Add dependencies only for tasks that genuinely block others.</span>
                     </div>
                   ) : (
                     dependencies.map(dep => (
-                      <div key={dep.id} className="px-5 py-3 hover:bg-slate-50 transition-colors">
+                      <div key={dep.id} className="px-5 py-3 hover:bg-white/[0.04] transition-colors">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 text-sm">
-                              <span className="font-medium text-slate-700 truncate" title={dep.predecessor_name}>
+                              <span className="font-medium text-white/80 truncate" title={dep.predecessor_name}>
                                 #{dep.predecessor_id} {dep.predecessor_name}
                               </span>
                               <ArrowRight className="w-4 h-4 text-teal-400 shrink-0" />
-                              <span className="text-slate-600 truncate" title={dep.successor_name}>
+                              <span className="text-white/50 truncate" title={dep.successor_name}>
                                 #{dep.successor_id} {dep.successor_name}
                               </span>
                             </div>
                             <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs px-1.5 py-0.5 bg-slate-100 rounded text-slate-500">
+                              <span className="text-xs px-1.5 py-0.5 bg-white/[0.06] rounded text-white/40">
                                 {dep.dependency_type === 'FS' ? 'Finish→Start' :
                                  dep.dependency_type === 'SS' ? 'Start→Start' :
                                  dep.dependency_type === 'FF' ? 'Finish→Finish' : dep.dependency_type}
                               </span>
                               {dep.lag_days > 0 && (
-                                <span className="text-xs text-slate-400">+{dep.lag_days}d lag</span>
+                                <span className="text-xs text-white/30">+{dep.lag_days}d lag</span>
                               )}
                               {dep.predecessor_resource && (
-                                <span className="text-xs text-slate-400">{dep.predecessor_resource}</span>
+                                <span className="text-xs text-white/30">{dep.predecessor_resource}</span>
                               )}
                             </div>
                           </div>
                           <button
-                            className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
+                            className="p-1.5 hover:bg-red-500/15 text-white/20 hover:text-red-400 rounded-lg transition-colors"
                             onClick={() => removeDep(dep.id)}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -269,26 +269,26 @@ export default function DependenciesPage() {
               </div>
 
               {/* Resource Load Summary */}
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100">
-                  <span className="font-semibold text-slate-700 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-blue-500" /> Resource Load (8 weeks)
+              <div className="bg-[#11111198] backdrop-blur-sm rounded-xl shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08] overflow-hidden">
+                <div className="px-5 py-3 border-b border-white/[0.06]">
+                  <span className="font-semibold text-white flex items-center gap-2">
+                    <Users className="w-4 h-4 text-blue-400" /> Resource Load (8 weeks)
                   </span>
                 </div>
-                <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
+                <div className="divide-y divide-white/[0.04] max-h-[400px] overflow-y-auto">
                   {resources.map(res => {
                     const badge = getLoadBadge(res.avgWeek, resourceLoad?.capacity_per_week || 40)
                     return (
                       <button
                         key={res.name}
                         className={cn(
-                          "w-full px-5 py-3 hover:bg-slate-50 transition-colors text-left",
-                          selectedResource === res.name && "bg-blue-50"
+                          "w-full px-5 py-3 hover:bg-white/[0.04] transition-colors text-left",
+                          selectedResource === res.name && "bg-blue-500/10"
                         )}
                         onClick={() => setSelectedResource(selectedResource === res.name ? null : res.name)}
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-sm text-slate-700">{res.name}</span>
+                          <span className="font-medium text-sm text-white">{res.name}</span>
                           <span className={cn("text-xs px-2 py-0.5 rounded-full", badge.color)}>{badge.text}</span>
                         </div>
                         {/* Weekly bars */}
@@ -305,7 +305,7 @@ export default function DependenciesPage() {
                             )
                           })}
                         </div>
-                        <div className="flex justify-between text-xs text-slate-400 mt-1">
+                        <div className="flex justify-between text-xs text-white/30 mt-1">
                           <span>{Math.round(res.totalHours)}h total</span>
                           <span>Peak: {Math.round(res.maxWeek)}h/wk</span>
                         </div>
@@ -318,19 +318,19 @@ export default function DependenciesPage() {
 
             {/* Selected Resource Detail */}
             {selectedResource && resourceLoad && (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-                  <span className="font-semibold text-slate-700">
+              <div className="bg-[#11111198] backdrop-blur-sm rounded-xl shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08] overflow-hidden">
+                <div className="px-5 py-3 border-b border-white/[0.06] flex items-center justify-between">
+                  <span className="font-semibold text-white">
                     📋 {selectedResource}'s Tasks
                   </span>
-                  <button onClick={() => setSelectedResource(null)} className="p-1 hover:bg-slate-100 rounded">
-                    <X className="w-4 h-4 text-slate-400" />
+                  <button onClick={() => setSelectedResource(null)} className="p-1 hover:bg-white/10 rounded">
+                    <X className="w-4 h-4 text-white/30" />
                   </button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
+                      <tr className="bg-white/[0.03] text-xs text-white/40 uppercase tracking-wider">
                         <th className="px-4 py-2 text-left">ID</th>
                         <th className="px-4 py-2 text-left">Task</th>
                         <th className="px-4 py-2 text-right">Hours</th>
@@ -340,22 +340,22 @@ export default function DependenciesPage() {
                         <th className="px-4 py-2 text-left">End</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-white/[0.04]">
                       {(resourceLoad.load[selectedResource]?.tasks || []).map(t => (
-                        <tr key={t.id} className="hover:bg-blue-50/50">
-                          <td className="px-4 py-2 text-slate-400">{t.id}</td>
-                          <td className="px-4 py-2 text-slate-700 font-medium">{t.name}</td>
-                          <td className="px-4 py-2 text-right text-slate-600">{Math.round(t.hours)}</td>
-                          <td className="px-4 py-2 text-right text-blue-600">{Math.round(t.remaining || 0)}</td>
+                        <tr key={t.id} className="hover:bg-white/[0.04]">
+                          <td className="px-4 py-2 text-white/30">{t.id}</td>
+                          <td className="px-4 py-2 text-white/80 font-medium">{t.name}</td>
+                          <td className="px-4 py-2 text-right text-white/50">{Math.round(t.hours)}</td>
+                          <td className="px-4 py-2 text-right text-blue-400">{Math.round(t.remaining || 0)}</td>
                           <td className="px-4 py-2 text-right">
                             <span className={cn("font-medium",
-                              t.percent >= 100 ? "text-green-600" : "text-slate-500"
+                              t.percent >= 100 ? "text-green-400" : "text-white/40"
                             )}>
                               {t.percent}%
                             </span>
                           </td>
-                          <td className="px-4 py-2 text-slate-500 text-xs">{t.start}</td>
-                          <td className="px-4 py-2 text-slate-500 text-xs">{t.end}</td>
+                          <td className="px-4 py-2 text-white/30 text-xs">{t.start}</td>
+                          <td className="px-4 py-2 text-white/30 text-xs">{t.end}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -385,9 +385,9 @@ export default function DependenciesPage() {
 
               {dependencies.length === 0 ? (
                 <div className="px-5 py-16 text-center">
-                  <GitBranch className="w-12 h-12 mx-auto mb-3 text-slate-200" />
-                  <h3 className="text-lg font-semibold text-slate-500 mb-1">No Blockers Yet</h3>
-                  <p className="text-sm text-slate-400 max-w-md mx-auto">
+                  <GitBranch className="w-12 h-12 mx-auto mb-3 text-white/10" />
+                  <h3 className="text-lg font-semibold text-white/30 mb-1">No Blockers Yet</h3>
+                  <p className="text-sm text-white/20 max-w-md mx-auto">
                     Dependencies are optional — only add them when one task genuinely blocks another.
                     Most tasks on this team don't have strict predecessors.
                   </p>
@@ -407,27 +407,27 @@ export default function DependenciesPage() {
                           <div className={cn(
                             "flex-1 p-3 rounded-xl border-2 transition-colors",
                             pred.percent_complete >= 100
-                              ? "border-green-200 bg-green-50"
-                              : "border-amber-200 bg-amber-50"
+                              ? "border-green-500/30 bg-green-500/10"
+                              : "border-amber-500/30 bg-amber-500/10"
                           )}>
                             <div className="flex items-center justify-between">
                               <div>
-                                <span className="text-xs text-slate-400">#{pred.id}</span>
-                                <h4 className="font-semibold text-sm text-slate-800">{pred.task}</h4>
-                                <span className="text-xs text-slate-500">{pred.resource}</span>
+                                <span className="text-xs text-white/30">#{pred.id}</span>
+                                <h4 className="font-semibold text-sm text-white">{pred.task}</h4>
+                                <span className="text-xs text-white/40">{pred.resource}</span>
                               </div>
                               <div className="text-right">
                                 <div className={cn(
                                   "text-lg font-bold",
-                                  pred.percent_complete >= 100 ? "text-green-600" : "text-amber-600"
+                                  pred.percent_complete >= 100 ? "text-green-400" : "text-amber-400"
                                 )}>
                                   {pred.percent_complete}%
                                 </div>
-                                <div className="text-xs text-slate-400">{Math.round(pred.work_hours)}h</div>
+                                <div className="text-xs text-white/30">{Math.round(pred.work_hours)}h</div>
                               </div>
                             </div>
                             {/* Progress bar */}
-                            <div className="mt-2 h-1.5 bg-white/80 rounded-full overflow-hidden">
+                            <div className="mt-2 h-1.5 bg-white/10 rounded-full overflow-hidden">
                               <div
                                 className={cn("h-full rounded-full",
                                   pred.percent_complete >= 100 ? "bg-green-500" : "bg-amber-400"
@@ -439,15 +439,15 @@ export default function DependenciesPage() {
 
                           {/* Arrow */}
                           <div className="flex flex-col items-center shrink-0">
-                            <span className="text-xs text-slate-400 mb-0.5">
+                            <span className="text-xs text-white/30 mb-0.5">
                               {dep.dependency_type === 'FS' ? 'finish → start' : dep.dependency_type}
                             </span>
                             <div className="flex items-center gap-0.5">
-                              <div className="w-8 h-0.5 bg-teal-300 rounded" />
+                              <div className="w-8 h-0.5 bg-teal-400/50 rounded" />
                               <ArrowRight className="w-4 h-4 text-teal-400" />
                             </div>
                             {dep.lag_days > 0 && (
-                              <span className="text-xs text-slate-400 mt-0.5">+{dep.lag_days}d</span>
+                              <span className="text-xs text-white/30 mt-0.5">+{dep.lag_days}d</span>
                             )}
                           </div>
 
@@ -455,24 +455,24 @@ export default function DependenciesPage() {
                           <div className={cn(
                             "flex-1 p-3 rounded-xl border-2 transition-colors",
                             pred.percent_complete >= 100
-                              ? "border-blue-200 bg-blue-50"
-                              : "border-slate-200 bg-slate-50"
+                              ? "border-blue-500/30 bg-blue-500/10"
+                              : "border-white/10 bg-white/[0.04]"
                           )}>
                             <div className="flex items-center justify-between">
                               <div>
-                                <span className="text-xs text-slate-400">#{succ.id}</span>
-                                <h4 className="font-semibold text-sm text-slate-800">{succ.task}</h4>
-                                <span className="text-xs text-slate-500">{succ.resource}</span>
+                                <span className="text-xs text-white/30">#{succ.id}</span>
+                                <h4 className="font-semibold text-sm text-white">{succ.task}</h4>
+                                <span className="text-xs text-white/40">{succ.resource}</span>
                               </div>
                               <div className="text-right">
-                                <div className="text-lg font-bold text-slate-600">
+                                <div className="text-lg font-bold text-white/60">
                                   {succ.percent_complete}%
                                 </div>
-                                <div className="text-xs text-slate-400">{Math.round(succ.work_hours)}h</div>
+                                <div className="text-xs text-white/30">{Math.round(succ.work_hours)}h</div>
                               </div>
                             </div>
                             {pred.percent_complete < 100 && (
-                              <div className="mt-2 flex items-center gap-1 text-xs text-amber-600 bg-amber-100 px-2 py-1 rounded-lg">
+                              <div className="mt-2 flex items-center gap-1 text-xs text-amber-400 bg-amber-500/15 px-2 py-1 rounded-lg">
                                 <Shield className="w-3 h-3" /> Blocked until predecessor completes
                               </div>
                             )}
@@ -480,7 +480,7 @@ export default function DependenciesPage() {
 
                           {/* Delete */}
                           <button
-                            className="p-2 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                            className="p-2 hover:bg-red-500/15 text-white/20 hover:text-red-400 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                             onClick={() => removeDep(dep.id)}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -499,34 +499,34 @@ export default function DependenciesPage() {
         {activeTab === 'load' && resourceLoad && (
           <div className="space-y-6">
             {/* Weekly Load Heatmap */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-5 py-3 border-b border-slate-100">
-                <span className="font-semibold text-slate-700 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-blue-500" /> Weekly Resource Load
+            <div className="bg-[#11111198] backdrop-blur-sm rounded-xl shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08] overflow-hidden">
+              <div className="px-5 py-3 border-b border-white/[0.06]">
+                <span className="font-semibold text-white flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-blue-400" /> Weekly Resource Load
                 </span>
-                <p className="text-xs text-slate-400 mt-0.5">Capacity: {resourceLoad.capacity_per_week}h/week per person. Red = overloaded.</p>
+                <p className="text-xs text-white/30 mt-0.5">Capacity: {resourceLoad.capacity_per_week}h/week per person. Red = overloaded.</p>
               </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-slate-50">
-                      <th className="text-left py-2.5 px-4 text-xs text-slate-500 font-semibold uppercase sticky left-0 bg-slate-50 z-10 w-36">Resource</th>
+                    <tr className="bg-white/[0.03]">
+                      <th className="text-left py-2.5 px-4 text-xs text-white/40 font-semibold uppercase sticky left-0 bg-[#111111] z-10 w-36">Resource</th>
                       {resourceLoad.weeks.map((w, i) => (
-                        <th key={i} className="py-2.5 px-3 text-center text-xs text-slate-500 font-medium whitespace-nowrap">{w}</th>
+                        <th key={i} className="py-2.5 px-3 text-center text-xs text-white/40 font-medium whitespace-nowrap">{w}</th>
                       ))}
-                      <th className="py-2.5 px-4 text-right text-xs text-slate-500 font-semibold uppercase">Avg/Wk</th>
-                      <th className="py-2.5 px-4 text-center text-xs text-slate-500 font-semibold uppercase">Status</th>
+                      <th className="py-2.5 px-4 text-right text-xs text-white/40 font-semibold uppercase">Avg/Wk</th>
+                      <th className="py-2.5 px-4 text-center text-xs text-white/40 font-semibold uppercase">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-white/[0.04]">
                     {resources.map(res => {
                       const badge = getLoadBadge(res.avgWeek, resourceLoad.capacity_per_week)
                       return (
-                        <tr key={res.name} className="hover:bg-slate-50/50">
-                          <td className="py-2 px-4 font-medium text-slate-700 sticky left-0 bg-white z-10">
+                        <tr key={res.name} className="hover:bg-white/[0.04]">
+                          <td className="py-2 px-4 font-medium text-white/80 sticky left-0 bg-[#111111] z-10">
                             <button
-                              className="hover:text-blue-600 transition-colors text-left"
+                              className="hover:text-blue-400 transition-colors text-left"
                               onClick={() => { setSelectedResource(res.name); setActiveTab('overview') }}
                             >
                               {res.name}
@@ -534,18 +534,18 @@ export default function DependenciesPage() {
                           </td>
                           {res.weeks.map((h, i) => {
                             const ratio = h / resourceLoad.capacity_per_week
-                            const cellColor = h === 0 ? 'bg-gray-50 text-gray-300'
-                              : ratio <= 0.5 ? 'bg-green-50 text-green-700'
-                              : ratio <= 0.8 ? 'bg-green-100 text-green-800'
-                              : ratio <= 1.0 ? 'bg-amber-100 text-amber-800'
-                              : 'bg-red-200 text-red-800 font-bold'
+                            const cellColor = h === 0 ? 'bg-white/[0.03] text-white/20'
+                              : ratio <= 0.5 ? 'bg-green-500/10 text-green-400'
+                              : ratio <= 0.8 ? 'bg-green-500/15 text-green-300'
+                              : ratio <= 1.0 ? 'bg-amber-500/15 text-amber-300'
+                              : 'bg-red-500/20 text-red-300 font-bold'
                             return (
                               <td key={i} className={cn("py-2 px-3 text-center text-xs rounded-sm", cellColor)}>
                                 {h > 0 ? Math.round(h) : '–'}
                               </td>
                             )
                           })}
-                          <td className="py-2 px-4 text-right text-xs font-semibold text-slate-600">
+                          <td className="py-2 px-4 text-right text-xs font-semibold text-white/60">
                             {Math.round(res.avgWeek)}h
                           </td>
                           <td className="py-2 px-4 text-center">
@@ -561,16 +561,16 @@ export default function DependenciesPage() {
 
             {/* Overload Alerts */}
             {resources.filter(r => r.overloaded).length > 0 && (
-              <div className="bg-red-50 rounded-xl border border-red-200 p-5">
-                <h3 className="font-semibold text-red-700 flex items-center gap-2 mb-3">
+              <div className="bg-red-500/10 rounded-xl border border-red-500/20 p-5">
+                <h3 className="font-semibold text-red-400 flex items-center gap-2 mb-3">
                   <AlertTriangle className="w-5 h-5" /> Overload Alerts
                 </h3>
                 <div className="space-y-2">
                   {resources.filter(r => r.overloaded).map(res => (
-                    <div key={res.name} className="bg-white rounded-lg p-3 border border-red-100">
+                    <div key={res.name} className="bg-white/[0.04] rounded-lg p-3 border border-red-500/15">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold text-sm text-red-800">{res.name}</span>
-                        <span className="text-xs text-red-600">Peak: {Math.round(res.maxWeek)}h/week ({Math.round(res.maxWeek / resourceLoad.capacity_per_week * 100)}% capacity)</span>
+                        <span className="font-semibold text-sm text-red-300">{res.name}</span>
+                        <span className="text-xs text-red-400">Peak: {Math.round(res.maxWeek)}h/week ({Math.round(res.maxWeek / resourceLoad.capacity_per_week * 100)}% capacity)</span>
                       </div>
                       <div className="flex gap-1">
                         {res.weeks.map((h, i) => (
@@ -578,16 +578,16 @@ export default function DependenciesPage() {
                             key={i}
                             className={cn(
                               "flex-1 h-6 rounded flex items-center justify-center text-xs",
-                              h > resourceLoad.capacity_per_week ? "bg-red-200 text-red-800 font-bold" :
-                              h > resourceLoad.capacity_per_week * 0.8 ? "bg-amber-100 text-amber-700" :
-                              "bg-green-100 text-green-700"
+                              h > resourceLoad.capacity_per_week ? "bg-red-500/20 text-red-300 font-bold" :
+                              h > resourceLoad.capacity_per_week * 0.8 ? "bg-amber-500/15 text-amber-300" :
+                              "bg-green-500/15 text-green-400"
                             )}
                           >
                             {Math.round(h)}
                           </div>
                         ))}
                       </div>
-                      <div className="flex justify-between mt-1 text-xs text-slate-400">
+                      <div className="flex justify-between mt-1 text-xs text-white/30">
                         {resourceLoad.weeks.map((w, i) => (
                           <span key={i} className="flex-1 text-center">{w}</span>
                         ))}
@@ -604,46 +604,46 @@ export default function DependenciesPage() {
       {/* Add Dependency Modal */}
       {showAddDep && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowAddDep(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-[540px] max-h-[600px] overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-                <GitBranch className="w-5 h-5 text-teal-500" /> Add Blocker Dependency
+          <div className="bg-[#111111] rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-white/[0.08] w-[540px] max-h-[600px] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between">
+              <h3 className="font-semibold text-white flex items-center gap-2">
+                <GitBranch className="w-5 h-5 text-teal-400" /> Add Blocker Dependency
               </h3>
-              <button className="p-1.5 hover:bg-slate-100 rounded-lg" onClick={() => setShowAddDep(false)}>
-                <X className="w-5 h-5 text-slate-400" />
+              <button className="p-1.5 hover:bg-white/10 rounded-lg" onClick={() => setShowAddDep(false)}>
+                <X className="w-5 h-5 text-white/30" />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
-              <p className="text-sm text-slate-500">
-                Only add a dependency when one task <strong>must</strong> complete before another can start.
+              <p className="text-sm text-white/40">
+                Only add a dependency when one task <strong className="text-white/60">must</strong> complete before another can start.
                 This is mainly to prevent resource overloading, not for typical task ordering.
               </p>
 
               {/* Predecessor */}
               <div>
-                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1 block">
+                <label className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-1 block">
                   Predecessor (must finish first)
                 </label>
                 <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-white/30" />
                   <input
-                    className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm"
+                    className="w-full pl-9 pr-3 py-2 bg-white/[0.06] border border-white/10 rounded-lg text-sm text-white placeholder-white/30"
                     placeholder="Search by task name or ID..."
                     value={searchPred}
                     onChange={e => { setSearchPred(e.target.value); setNewDep({ ...newDep, predecessor_id: '' }) }}
                   />
                 </div>
                 {searchPred && !newDep.predecessor_id && (
-                  <div className="mt-1 border rounded-lg max-h-32 overflow-y-auto">
+                  <div className="mt-1 border border-white/10 bg-[#111111] rounded-lg max-h-32 overflow-y-auto">
                     {filteredPred.map(t => (
                       <button
                         key={t.id}
-                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 transition-colors"
+                        className="w-full text-left px-3 py-1.5 text-sm text-white/80 hover:bg-white/[0.06] transition-colors"
                         onClick={() => { setNewDep({ ...newDep, predecessor_id: t.id }); setSearchPred(`#${t.id} ${t.task}`) }}
                       >
-                        <span className="text-slate-400">#{t.id}</span> {t.task}
-                        <span className="text-xs text-slate-400 ml-2">{t.resource}</span>
+                        <span className="text-white/30">#{t.id}</span> {t.task}
+                        <span className="text-xs text-white/30 ml-2">{t.resource}</span>
                       </button>
                     ))}
                   </div>
@@ -652,28 +652,28 @@ export default function DependenciesPage() {
 
               {/* Successor */}
               <div>
-                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1 block">
+                <label className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-1 block">
                   Successor (blocked until predecessor finishes)
                 </label>
                 <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-white/30" />
                   <input
-                    className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm"
+                    className="w-full pl-9 pr-3 py-2 bg-white/[0.06] border border-white/10 rounded-lg text-sm text-white placeholder-white/30"
                     placeholder="Search by task name or ID..."
                     value={searchSucc}
                     onChange={e => { setSearchSucc(e.target.value); setNewDep({ ...newDep, successor_id: '' }) }}
                   />
                 </div>
                 {searchSucc && !newDep.successor_id && (
-                  <div className="mt-1 border rounded-lg max-h-32 overflow-y-auto">
+                  <div className="mt-1 border border-white/10 bg-[#111111] rounded-lg max-h-32 overflow-y-auto">
                     {filteredSucc.map(t => (
                       <button
                         key={t.id}
-                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 transition-colors"
+                        className="w-full text-left px-3 py-1.5 text-sm text-white/80 hover:bg-white/[0.06] transition-colors"
                         onClick={() => { setNewDep({ ...newDep, successor_id: t.id }); setSearchSucc(`#${t.id} ${t.task}`) }}
                       >
-                        <span className="text-slate-400">#{t.id}</span> {t.task}
-                        <span className="text-xs text-slate-400 ml-2">{t.resource}</span>
+                        <span className="text-white/30">#{t.id}</span> {t.task}
+                        <span className="text-xs text-white/30 ml-2">{t.resource}</span>
                       </button>
                     ))}
                   </div>
@@ -683,9 +683,9 @@ export default function DependenciesPage() {
               {/* Type + Lag */}
               <div className="flex gap-3">
                 <div className="flex-1">
-                  <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1 block">Type</label>
+                  <label className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-1 block">Type</label>
                   <select
-                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                    className="w-full px-3 py-2 bg-white/[0.06] border border-white/10 rounded-lg text-sm text-white"
                     value={newDep.dependency_type}
                     onChange={e => setNewDep({ ...newDep, dependency_type: e.target.value })}
                   >
@@ -696,10 +696,10 @@ export default function DependenciesPage() {
                   </select>
                 </div>
                 <div className="w-28">
-                  <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1 block">Lag (days)</label>
+                  <label className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-1 block">Lag (days)</label>
                   <input
                     type="number"
-                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                    className="w-full px-3 py-2 bg-white/[0.06] border border-white/10 rounded-lg text-sm text-white"
                     value={newDep.lag_days}
                     onChange={e => setNewDep({ ...newDep, lag_days: parseInt(e.target.value) || 0 })}
                   />
@@ -707,9 +707,9 @@ export default function DependenciesPage() {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+            <div className="px-6 py-4 border-t border-white/[0.06] flex justify-end gap-3">
               <button
-                className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm text-white/50 hover:bg-white/10 rounded-lg transition-colors"
                 onClick={() => setShowAddDep(false)}
               >
                 Cancel
@@ -718,8 +718,8 @@ export default function DependenciesPage() {
                 className={cn(
                   "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
                   newDep.predecessor_id && newDep.successor_id
-                    ? "bg-teal-500 text-white hover:bg-teal-600"
-                    : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    ? "bg-teal-500 text-white hover:bg-teal-600 shadow-[0_0_15px_rgba(20,184,166,0.3)]"
+                    : "bg-white/[0.06] text-white/20 cursor-not-allowed"
                 )}
                 onClick={addDependency}
                 disabled={!newDep.predecessor_id || !newDep.successor_id}

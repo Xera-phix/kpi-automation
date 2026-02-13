@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -40,7 +41,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarEleme
 const API_BASE = '/api'
 
 // Utility for combining classes
-const cn = (...classes) => classes.filter(Boolean).join(' ')
+import { cn } from '@/lib/utils'
 
 function App() {
   const [tasks, setTasks] = useState([])
@@ -281,16 +282,17 @@ function App() {
           usePointStyle: true,
           boxWidth: 6,
           padding: 16,
-          font: { size: 11, weight: '500' }
+          font: { size: 11, weight: '500' },
+          color: 'rgba(255,255,255,0.6)'
         }
       },
       tooltip: {
         mode: 'index',
         intersect: false,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        titleColor: '#1f2937',
-        bodyColor: '#4b5563',
-        borderColor: 'rgba(0, 0, 0, 0.1)',
+        backgroundColor: 'rgba(17, 17, 17, 0.95)',
+        titleColor: '#ffffff',
+        bodyColor: 'rgba(255,255,255,0.7)',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
         borderWidth: 1,
         padding: 12,
         boxPadding: 4,
@@ -300,12 +302,12 @@ function App() {
     scales: {
       x: {
         grid: { display: false },
-        ticks: { maxTicksLimit: 8, font: { size: 10 } }
+        ticks: { maxTicksLimit: 8, font: { size: 10 }, color: 'rgba(255,255,255,0.4)' }
       },
       y: {
         beginAtZero: true,
-        grid: { color: 'rgba(0,0,0,0.04)' },
-        ticks: { font: { size: 10 } }
+        grid: { color: 'rgba(255,255,255,0.06)' },
+        ticks: { font: { size: 10 }, color: 'rgba(255,255,255,0.4)' }
       }
     },
     interaction: { mode: 'nearest', axis: 'x', intersect: false }
@@ -344,13 +346,13 @@ function App() {
     plugins: { 
       legend: {
         position: 'top',
-        labels: { usePointStyle: true, boxWidth: 6, padding: 12, font: { size: 11 } }
+        labels: { usePointStyle: true, boxWidth: 6, padding: 12, font: { size: 11 }, color: 'rgba(255,255,255,0.6)' }
       },
       tooltip: {
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        titleColor: '#1f2937',
-        bodyColor: '#4b5563',
-        borderColor: 'rgba(0, 0, 0, 0.1)',
+        backgroundColor: 'rgba(17, 17, 17, 0.95)',
+        titleColor: '#ffffff',
+        bodyColor: 'rgba(255,255,255,0.7)',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
         borderWidth: 1,
         padding: 12,
         cornerRadius: 8,
@@ -368,8 +370,8 @@ function App() {
       }
     },
     scales: {
-      x: { stacked: true, grid: { display: false }, max: 100, ticks: { callback: v => v + '%', font: { size: 10 } } },
-      y: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } }
+      x: { stacked: true, grid: { display: false }, max: 100, ticks: { callback: v => v + '%', font: { size: 10 }, color: 'rgba(255,255,255,0.4)' } },
+      y: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, color: 'rgba(255,255,255,0.5)' } }
     }
   }
 
@@ -394,7 +396,7 @@ function App() {
     plugins: {
       legend: {
         position: 'bottom',
-        labels: { usePointStyle: true, boxWidth: 6, padding: 16, font: { size: 11 } }
+        labels: { usePointStyle: true, boxWidth: 6, padding: 16, font: { size: 11 }, color: 'rgba(255,255,255,0.6)' }
       }
     }
   }
@@ -402,9 +404,9 @@ function App() {
   const variance = summary.total_variance || 0
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100">
+    <div className="min-h-screen bg-[#0a0a0a]">
       {/* Header */}
-      <header className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white shadow-lg">
+      <header className="bg-[#11111198] backdrop-blur-xl border-b border-white/[0.08] text-white">
         <div className="max-w-[1800px] mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
@@ -412,29 +414,29 @@ function App() {
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-tight">KPI Project Tracker</h1>
-              <p className="text-blue-200 text-sm">Schedule-IKP • Software Development</p>
+              <p className="text-white/40 text-sm">Schedule-IKP • Software Development</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 text-sm text-blue-200">
-            <Link to="/timeline" className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
+          <div className="flex items-center gap-4 text-sm text-white/40">
+            <Link to="/timeline" className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] hover:bg-white/[0.12] rounded-lg transition-colors border border-white/[0.06]">
               <Calendar className="w-4 h-4" />
               <span className="font-medium text-white">Timeline</span>
               <span className="px-1.5 py-0.5 bg-amber-400/20 text-amber-300 rounded text-[10px] font-bold">POC</span>
             </Link>
-            <Link to="/dependencies" className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
+            <Link to="/dependencies" className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] hover:bg-white/[0.12] rounded-lg transition-colors border border-white/[0.06]">
               <GitBranch className="w-4 h-4" />
               <span className="font-medium text-white">Dependencies</span>
               <span className="px-1.5 py-0.5 bg-amber-400/20 text-amber-300 rounded text-[10px] font-bold">POC</span>
             </Link>
-            <Link to="/management" className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
+            <Link to="/management" className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] hover:bg-white/[0.12] rounded-lg transition-colors border border-white/[0.06]">
               <Briefcase className="w-4 h-4" />
               <span className="font-medium text-white">Management</span>
             </Link>
-            <Link to="/baselines" className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
+            <Link to="/baselines" className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] hover:bg-white/[0.12] rounded-lg transition-colors border border-white/[0.06]">
               <Database className="w-4 h-4" />
               <span className="font-medium text-white">Baselines</span>
             </Link>
-            <Link to="/what-if" className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
+            <Link to="/what-if" className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] hover:bg-white/[0.12] rounded-lg transition-colors border border-white/[0.06]">
               <FlaskConical className="w-4 h-4" />
               <span className="font-medium text-white">What-If</span>
             </Link>
@@ -444,7 +446,7 @@ function App() {
       </header>
 
       {/* Stats Bar */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200/60 sticky top-0 z-10">
+      <div className="bg-[#11111198] backdrop-blur-sm border-b border-white/[0.06] sticky top-0 z-10">
         <div className="max-w-[1800px] mx-auto px-6 py-4">
           <div className="flex items-center gap-8">
             <StatCard icon={<CheckCircle2 className="w-5 h-5" />} value={summary.total_tasks || 0} label="Tasks" />
@@ -478,12 +480,12 @@ function App() {
       <div className="max-w-[1800px] mx-auto px-6 py-6">
         {/* Mismatch Warnings Banner */}
         {mismatchWarnings.length > 0 && (
-          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3">
-            <div className="flex items-center gap-2 text-amber-700 text-sm font-semibold mb-1">
+          <div className="mb-4 bg-amber-500/10 border border-amber-500/20 rounded-xl px-5 py-3">
+            <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold mb-1">
               <AlertTriangle className="w-4 h-4" />
               {mismatchWarnings.length} Hours vs Progress Mismatch{mismatchWarnings.length > 1 ? 'es' : ''}
             </div>
-            <div className="text-xs text-amber-600 space-x-4">
+            <div className="text-xs text-amber-400/70 space-x-4">
               {mismatchWarnings.slice(0, 3).map(w => (
                 <span key={w.task_id}>{w.task}: {w.gap}pts {w.direction}</span>
               ))}
@@ -493,24 +495,24 @@ function App() {
         )}
         <div className="flex gap-6">
           {/* Task Table */}
-          <div className="flex-1 bg-white rounded-2xl shadow-card border border-slate-200/60 overflow-hidden">
+          <div className="flex-1 bg-[#11111198] backdrop-blur-sm rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-slate-50/80 border-b border-slate-100">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">ID</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Task</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Resource</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Work</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Done</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Left</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Var</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Finish</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Stage</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-48">Progress</th>
+                  <tr className="bg-white/[0.03] border-b border-white/[0.06]">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">ID</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Task</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Resource</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Work</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Done</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Left</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Var</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Finish</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Stage</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider w-48">Progress</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-white/[0.04]">
                   {tasks.map(task => {
                     const isParent = tasks.some(t => t.parent_task === task.task)
                     const isChild = !!task.parent_task
@@ -520,31 +522,31 @@ function App() {
                       <tr 
                         key={task.id} 
                         className={cn(
-                          "hover:bg-blue-50/50 transition-colors",
-                          isParent && "bg-gradient-to-r from-slate-50 to-blue-50/30 border-l-2 border-l-blue-400",
-                          isChild && "bg-white"
+                          "hover:bg-white/[0.04] transition-colors",
+                          isParent && "bg-white/[0.03] border-l-2 border-l-blue-500/50",
+                          isChild && ""
                         )}
                       >
-                        <td className={cn("px-4 py-3 text-sm", isParent ? "text-blue-600 font-semibold" : "text-slate-400")}>
+                        <td className={cn("px-4 py-3 text-sm", isParent ? "text-blue-400 font-semibold" : "text-white/30")}>
                           {task.id}
                         </td>
                         <td className="px-4 py-3">
                           <span className={cn(
                             "text-sm flex items-center",
                             isChild && "pl-6",
-                            isParent && "font-semibold text-slate-800"
+                            isParent && "font-semibold text-white"
                           )}>
-                            {isChild && <span className="text-slate-300 mr-1.5 text-xs">└─</span>}
-                            {isParent && <span className="mr-1.5 text-blue-500">▸</span>}
-                            <span className={isChild ? "text-slate-600" : ""}>{task.task}</span>
+                            {isChild && <span className="text-white/20 mr-1.5 text-xs">└─</span>}
+                            {isParent && <span className="mr-1.5 text-blue-400">▸</span>}
+                            <span className={isChild ? "text-white/70" : ""}>{task.task}</span>
                           </span>
                         </td>
                         <td className="px-4 py-3">
                           {isParent ? (
-                            <span className="text-xs text-slate-400 italic">auto</span>
+                            <span className="text-xs text-white/30 italic">auto</span>
                           ) : (
                             <select
-                              className="text-sm bg-transparent border-none text-slate-600 cursor-pointer hover:text-blue-600 focus:outline-none appearance-none pr-0"
+                              className="text-sm bg-transparent border-none text-white/60 cursor-pointer hover:text-blue-400 focus:outline-none appearance-none pr-0"
                               value={task.resource || ''}
                               onChange={(e) => updateTask(task.id, 'resource', e.target.value)}
                             >
@@ -554,38 +556,37 @@ function App() {
                             </select>
                           )}
                         </td>
-                        <td className={cn("px-4 py-3 text-sm text-right font-medium", isParent ? "text-slate-800" : "text-slate-700")}>
+                        <td className={cn("px-4 py-3 text-sm text-right font-medium", isParent ? "text-white" : "text-white/70")}>
                           {Math.round(task.work_hours)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-right text-green-600 font-medium">
+                        <td className="px-4 py-3 text-sm text-right text-green-400 font-medium">
                           {Math.round(task.hours_completed || 0)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-right text-blue-600">
+                        <td className="px-4 py-3 text-sm text-right text-blue-400">
                           {Math.round(task.hours_remaining || task.work_hours)}
                         </td>
                         <td className={cn(
                           "px-4 py-3 text-sm text-right font-medium",
-                          taskVariance > 0 && "text-red-500",
-                          taskVariance < 0 && "text-green-500",
-                          taskVariance === 0 && "text-slate-400"
+                          taskVariance > 0 && "text-red-400",
+                          taskVariance < 0 && "text-green-400",
+                          taskVariance === 0 && "text-white/30"
                         )}>
                           {taskVariance > 0 ? '+' : ''}{Math.round(taskVariance)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-slate-600">
-                          {task.finish_date}
+                        <td className="px-4 py-3 text-sm text-white/50">
                         </td>
                         <td className="px-4 py-3">
                           {isParent ? (
-                            <span className="text-xs text-slate-400 italic">—</span>
+                            <span className="text-xs text-white/30 italic">—</span>
                           ) : (
                             <select
                               className={cn(
                                 "text-xs px-2 py-1 rounded-lg font-semibold border-none cursor-pointer focus:outline-none",
-                                task.cr_stage === 'resolved' ? "bg-green-100 text-green-700" :
-                                task.cr_stage === 'review' ? "bg-purple-100 text-purple-700" :
-                                task.cr_stage === 'implemented' ? "bg-blue-100 text-blue-700" :
-                                task.cr_stage === 'analyzed' ? "bg-amber-100 text-amber-700" :
-                                "bg-slate-100 text-slate-600"
+                                task.cr_stage === 'resolved' ? "bg-green-500/20 text-green-400" :
+                                task.cr_stage === 'review' ? "bg-purple-500/20 text-purple-400" :
+                                task.cr_stage === 'implemented' ? "bg-blue-500/20 text-blue-400" :
+                                task.cr_stage === 'analyzed' ? "bg-amber-500/20 text-amber-400" :
+                                "bg-white/10 text-white/50"
                               )}
                               value={task.cr_stage || 'submitted'}
                               onChange={async (e) => {
@@ -610,20 +611,20 @@ function App() {
                                 ⚠️
                               </span>
                             )}
-                            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
                               <div 
                                 className={cn(
                                   "h-full rounded-full transition-all duration-300",
                                   task.percent_complete >= 100 ? "bg-green-500" :
                                   task.percent_complete >= 75 ? "bg-blue-500" :
                                   task.percent_complete >= 50 ? "bg-blue-400" :
-                                  task.percent_complete >= 25 ? "bg-amber-400" : "bg-slate-300"
+                                  task.percent_complete >= 25 ? "bg-amber-400" : "bg-white/20"
                                 )}
                                 style={{ width: `${task.percent_complete}%` }}
                               />
                             </div>
                             {isParent ? (
-                              <span className="text-xs font-semibold text-slate-600 w-10 text-right">
+                              <span className="text-xs font-semibold text-white/60 w-10 text-right">
                                 {task.percent_complete}%
                               </span>
                             ) : (
@@ -636,7 +637,7 @@ function App() {
                                   className="w-16 h-1 accent-blue-500 cursor-pointer opacity-0 hover:opacity-100 absolute"
                                   onChange={(e) => updateTask(task.id, 'percent_complete', parseInt(e.target.value))}
                                 />
-                                <span className="text-xs font-medium text-slate-500 w-10 text-right">
+                                <span className="text-xs font-medium text-white/40 w-10 text-right">
                                   {task.percent_complete}%
                                 </span>
                               </>
@@ -654,13 +655,13 @@ function App() {
           {/* Right Panel - Chat & Analytics */}
           <div className="w-96 flex flex-col gap-4" style={{ height: 'calc(100vh - 180px)' }}>
             {/* AI Chat Panel - Always visible at top */}
-            <div className="bg-white rounded-2xl shadow-card border border-slate-200/60 overflow-hidden flex flex-col" style={{ minHeight: '350px', flex: showCharts ? '1 1 350px' : '1 1 auto' }}>
-              <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2 shrink-0">
+            <div className="bg-[#11111198] backdrop-blur-sm rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08] overflow-hidden flex flex-col" style={{ minHeight: '350px', flex: showCharts ? '1 1 350px' : '1 1 auto' }}>
+              <div className="px-5 py-3 border-b border-white/[0.06] flex items-center gap-2 shrink-0">
                 <div className="p-1.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
                   <Bot className="w-4 h-4 text-white" />
                 </div>
-                <span className="font-semibold text-slate-700">AI Copilot</span>
-                <span className="ml-auto text-xs text-slate-400">{messages.length - 1} messages</span>
+                <span className="font-semibold text-white">AI Copilot</span>
+                <span className="ml-auto text-xs text-white/30">{messages.length - 1} messages</span>
               </div>
               
               <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={chatRef}>
@@ -676,7 +677,7 @@ function App() {
                       "max-w-[85%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed",
                       msg.role === 'user' 
                         ? "bg-blue-500 text-white rounded-br-md" 
-                        : "bg-slate-100 text-slate-700 rounded-bl-md",
+                        : "bg-white/[0.06] text-white/80 rounded-bl-md",
                       msg.loading && "animate-pulse"
                     )}>
                       {msg.content}
@@ -692,25 +693,25 @@ function App() {
                         className={cn(
                           "w-full text-left px-4 py-3 rounded-xl text-sm transition-all",
                           opt.label?.toLowerCase().includes('cancel')
-                            ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                            : "bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
+                            ? "bg-white/[0.06] text-white/60 hover:bg-white/10"
+                            : "bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-500/30"
                         )}
                         onClick={() => confirmAction(opt.option)}
                         disabled={loading}
                       >
                         <span className="font-semibold">{opt.option}.</span> {opt.label}
-                        {opt.description && <span className="block text-xs text-slate-500 mt-0.5">{opt.description}</span>}
+                        {opt.description && <span className="block text-xs text-white/40 mt-0.5">{opt.description}</span>}
                       </button>
                     ))}
                   </div>
                 )}
               </div>
               
-              <div className="p-3 border-t border-slate-100 bg-slate-50/50 shrink-0">
+              <div className="p-3 border-t border-white/[0.06] bg-white/[0.02] shrink-0">
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    className="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-400"
+                    className="flex-1 px-4 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent placeholder-white/30"
                     placeholder={pendingAction ? "Choose an option..." : "Type instructions..."}
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
@@ -721,8 +722,8 @@ function App() {
                     className={cn(
                       "px-4 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center gap-2",
                       loading || pendingAction || !chatInput.trim()
-                        ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                        : "bg-blue-500 text-white hover:bg-blue-600 shadow-sm"
+                        ? "bg-white/[0.06] text-white/30 cursor-not-allowed"
+                        : "bg-blue-500 text-white hover:bg-blue-600 shadow-[0_0_15px_rgba(59,130,246,0.3)]"
                     )}
                     onClick={sendChat} 
                     disabled={loading || pendingAction || !chatInput.trim()}
@@ -734,16 +735,16 @@ function App() {
             </div>
 
             {/* Analytics Panel - Collapsible below chat */}
-            <div className="bg-white rounded-2xl shadow-card border border-slate-200/60 overflow-hidden" style={{ flex: showCharts ? '1 1 auto' : '0 0 auto' }}>
+            <div className="bg-[#11111198] backdrop-blur-sm rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08] overflow-hidden" style={{ flex: showCharts ? '1 1 auto' : '0 0 auto' }}>
               <button 
-                className="w-full px-5 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors"
+                className="w-full px-5 py-3 flex items-center justify-between hover:bg-white/[0.04] transition-colors"
                 onClick={() => setShowCharts(!showCharts)}
               >
                 <div className="flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-blue-500" />
-                  <span className="font-semibold text-slate-700">Analytics</span>
+                  <BarChart3 className="w-5 h-5 text-blue-400" />
+                  <span className="font-semibold text-white">Analytics</span>
                 </div>
-                {showCharts ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                {showCharts ? <ChevronUp className="w-4 h-4 text-white/30" /> : <ChevronDown className="w-4 h-4 text-white/30" />}
               </button>
               
               {showCharts && (
@@ -751,9 +752,9 @@ function App() {
                   {/* S-Curve Card */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-600">S-Curve</span>
+                      <span className="text-sm font-medium text-white/60">S-Curve</span>
                       <select 
-                        className="text-xs border-0 bg-slate-100 rounded-lg px-2 py-1 text-slate-600 cursor-pointer focus:ring-2 focus:ring-blue-500"
+                        className="text-xs border-0 bg-white/[0.08] rounded-lg px-2 py-1 text-white/60 cursor-pointer focus:ring-2 focus:ring-blue-500/50"
                         value={selectedProject || ''}
                         onChange={(e) => setSelectedProject(e.target.value || null)}
                       >
@@ -780,9 +781,9 @@ function App() {
                   {/* Resource Workload */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-600">Resource Workload</span>
+                      <span className="text-sm font-medium text-white/60">Resource Workload</span>
                       {resourceAllocation.some(r => r.overallocated) && (
-                        <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full font-medium">⚠️ Overallocation</span>
+                        <span className="text-xs text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full font-medium">⚠️ Overallocation</span>
                       )}
                     </div>
                     <div className="h-36 -mx-2">
@@ -794,7 +795,7 @@ function App() {
                           key={r.name}
                           className={cn(
                             "text-xs px-2 py-1 rounded-full font-medium",
-                            r.overallocated ? "bg-red-50 text-red-600" : "bg-slate-100 text-slate-600"
+                            r.overallocated ? "bg-red-500/20 text-red-400" : "bg-white/[0.06] text-white/50"
                           )}
                         >
                           {r.name} {r.utilization}%
@@ -805,12 +806,12 @@ function App() {
 
                   {/* Phase Breakdown */}
                   <div className="space-y-3">
-                    <span className="text-sm font-medium text-slate-600">Phase Breakdown</span>
+                    <span className="text-sm font-medium text-white/60">Phase Breakdown</span>
                     <div className="h-32">
                       {(totalDev + totalTest + totalReview) > 0 ? (
                         <Doughnut data={phaseChartData} options={phaseChartOptions} />
                       ) : (
-                        <div className="h-full flex items-center justify-center text-slate-400 text-sm">No phase data</div>
+                        <div className="h-full flex items-center justify-center text-white/30 text-sm">No phase data</div>
                       )}
                     </div>
                   </div>
@@ -840,11 +841,11 @@ function App() {
 // Stat Card Component
 function StatCard({ icon, value, label, color = 'blue' }) {
   const colorClasses = {
-    blue: 'text-blue-500 bg-blue-50',
-    green: 'text-green-500 bg-green-50',
-    red: 'text-red-500 bg-red-50',
-    purple: 'text-purple-500 bg-purple-50',
-    gray: 'text-slate-400 bg-slate-50',
+    blue: 'text-blue-400 bg-blue-500/15',
+    green: 'text-green-400 bg-green-500/15',
+    red: 'text-red-400 bg-red-500/15',
+    purple: 'text-purple-400 bg-purple-500/15',
+    gray: 'text-white/40 bg-white/[0.06]',
   }
   
   return (
@@ -853,8 +854,8 @@ function StatCard({ icon, value, label, color = 'blue' }) {
         {icon}
       </div>
       <div>
-        <div className="text-xl font-bold text-slate-800">{value}</div>
-        <div className="text-xs text-slate-500 font-medium uppercase tracking-wide">{label}</div>
+        <div className="text-xl font-bold text-white">{value}</div>
+        <div className="text-xs text-white/40 font-medium uppercase tracking-wide">{label}</div>
       </div>
     </div>
   )
