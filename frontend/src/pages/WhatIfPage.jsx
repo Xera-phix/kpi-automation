@@ -116,7 +116,7 @@ export default function WhatIfPage() {
                 <>
                   <div>
                     <label className="block text-sm font-medium text-white/60 mb-1">Resource to Remove</label>
-                    <select className="w-full px-3 py-2 bg-white/[0.06] border border-white/10 rounded-lg text-sm text-white" value={selectedResource} onChange={e => setSelectedResource(e.target.value)}>
+                    <select className="w-full px-3 py-2 bg-[#111111] border border-white/10 rounded-lg text-sm text-white" value={selectedResource} onChange={e => setSelectedResource(e.target.value)}>
                       {resources.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
                     </select>
                   </div>
@@ -138,7 +138,7 @@ export default function WhatIfPage() {
                 <>
                   <div>
                     <label className="block text-sm font-medium text-white/60 mb-1">Task</label>
-                    <select className="w-full px-3 py-2 bg-white/[0.06] border border-white/10 rounded-lg text-sm text-white" value={selectedTask} onChange={e => setSelectedTask(e.target.value)}>
+                    <select className="w-full px-3 py-2 bg-[#111111] border border-white/10 rounded-lg text-sm text-white" value={selectedTask} onChange={e => setSelectedTask(e.target.value)}>
                       {tasks.filter(t => !tasks.some(x => x.parent_task === t.task)).map(t => (
                         <option key={t.id} value={t.id}>{t.task} ({t.resource})</option>
                       ))}

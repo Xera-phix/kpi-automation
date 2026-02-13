@@ -197,6 +197,21 @@ select, input[type="text"], input[type="number"], input[type="date"], textarea {
   color-scheme: dark;
 }
 
+select {
+  background-color: #111111 !important;
+}
+
+select option {
+  background-color: #111111;
+  color: rgba(255, 255, 255, 0.8);
+  padding: 8px 12px;
+}
+
+select option:hover,
+select option:checked {
+  background-color: rgba(59, 130, 246, 0.2);
+}
+
 /* Print styles */
 @media print {
   .no-print {

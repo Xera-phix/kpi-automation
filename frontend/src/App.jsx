@@ -546,7 +546,7 @@ function App() {
                             <span className="text-xs text-white/30 italic">auto</span>
                           ) : (
                             <select
-                              className="text-sm bg-transparent border-none text-white/60 cursor-pointer hover:text-blue-400 focus:outline-none appearance-none pr-0"
+                              className="text-sm bg-[#111111] border border-white/10 rounded text-white/60 cursor-pointer hover:text-blue-400 focus:outline-none px-1"
                               value={task.resource || ''}
                               onChange={(e) => updateTask(task.id, 'resource', e.target.value)}
                             >
@@ -581,7 +581,7 @@ function App() {
                           ) : (
                             <select
                               className={cn(
-                                "text-xs px-2 py-1 rounded-lg font-semibold border-none cursor-pointer focus:outline-none",
+                                "text-xs px-2 py-1 rounded-lg font-semibold border border-white/10 cursor-pointer focus:outline-none bg-[#111111]",
                                 task.cr_stage === 'resolved' ? "bg-green-500/20 text-green-400" :
                                 task.cr_stage === 'review' ? "bg-purple-500/20 text-purple-400" :
                                 task.cr_stage === 'implemented' ? "bg-blue-500/20 text-blue-400" :
@@ -754,7 +754,7 @@ function App() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-white/60">S-Curve</span>
                       <select 
-                        className="text-xs border-0 bg-white/[0.08] rounded-lg px-2 py-1 text-white/60 cursor-pointer focus:ring-2 focus:ring-blue-500/50"
+                        className="text-xs border border-white/10 bg-[#111111] rounded-lg px-2 py-1 text-white/60 cursor-pointer focus:ring-2 focus:ring-blue-500/50"
                         value={selectedProject || ''}
                         onChange={(e) => setSelectedProject(e.target.value || null)}
                       >

@@ -685,7 +685,7 @@ export default function DependenciesPage() {
                 <div className="flex-1">
                   <label className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-1 block">Type</label>
                   <select
-                    className="w-full px-3 py-2 bg-white/[0.06] border border-white/10 rounded-lg text-sm text-white"
+                    className="w-full px-3 py-2 bg-[#111111] border border-white/10 rounded-lg text-sm text-white"
                     value={newDep.dependency_type}
                     onChange={e => setNewDep({ ...newDep, dependency_type: e.target.value })}
                   >
