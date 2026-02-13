@@ -30,6 +30,9 @@ import {
   X,
   Calendar,
   GitBranch,
+  Briefcase,
+  Database,
+  FlaskConical,
 } from 'lucide-react'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Filler, Tooltip, Legend)
@@ -55,23 +58,29 @@ function App() {
   const [projectScurve, setProjectScurve] = useState(null)
   const [showCharts, setShowCharts] = useState(true)
   const [resourceAllocation, setResourceAllocation] = useState([])
+  const [mismatchWarnings, setMismatchWarnings] = useState([])
+  const [crStages, setCrStages] = useState({})
   const chatRef = useRef(null)
 
   // Fetch all data
   const fetchData = async () => {
     try {
-      const [tasksRes, summaryRes, scurveRes, resourcesRes, allocRes] = await Promise.all([
+      const [tasksRes, summaryRes, scurveRes, resourcesRes, allocRes, mismatchRes, stagesRes] = await Promise.all([
         fetch(`${API_BASE}/tasks`),
         fetch(`${API_BASE}/summary`),
         fetch(`${API_BASE}/scurve`),
         fetch(`${API_BASE}/resources`),
-        fetch(`${API_BASE}/resource-allocation`)
+        fetch(`${API_BASE}/resource-allocation`),
+        fetch(`${API_BASE}/mismatch-warnings`),
+        fetch(`${API_BASE}/cr-stages`)
       ])
       setTasks(await tasksRes.json())
       setSummary(await summaryRes.json())
       setScurveData(await scurveRes.json())
       setResources(await resourcesRes.json())
       setResourceAllocation(await allocRes.json())
+      setMismatchWarnings(await mismatchRes.json())
+      setCrStages(await stagesRes.json())
     } catch (err) {
       showToast('Failed to load data', 'error')
     }
@@ -417,7 +426,19 @@ function App() {
               <span className="font-medium text-white">Dependencies</span>
               <span className="px-1.5 py-0.5 bg-amber-400/20 text-amber-300 rounded text-[10px] font-bold">POC</span>
             </Link>
-            <span className="px-3 py-1 bg-white/10 rounded-full text-xs font-medium">v2.1</span>
+            <Link to="/management" className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
+              <Briefcase className="w-4 h-4" />
+              <span className="font-medium text-white">Management</span>
+            </Link>
+            <Link to="/baselines" className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
+              <Database className="w-4 h-4" />
+              <span className="font-medium text-white">Baselines</span>
+            </Link>
+            <Link to="/what-if" className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
+              <FlaskConical className="w-4 h-4" />
+              <span className="font-medium text-white">What-If</span>
+            </Link>
+            <span className="px-3 py-1 bg-white/10 rounded-full text-xs font-medium">v2.2</span>
           </div>
         </div>
       </header>
@@ -455,6 +476,21 @@ function App() {
 
       {/* Main Content */}
       <div className="max-w-[1800px] mx-auto px-6 py-6">
+        {/* Mismatch Warnings Banner */}
+        {mismatchWarnings.length > 0 && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3">
+            <div className="flex items-center gap-2 text-amber-700 text-sm font-semibold mb-1">
+              <AlertTriangle className="w-4 h-4" />
+              {mismatchWarnings.length} Hours vs Progress Mismatch{mismatchWarnings.length > 1 ? 'es' : ''}
+            </div>
+            <div className="text-xs text-amber-600 space-x-4">
+              {mismatchWarnings.slice(0, 3).map(w => (
+                <span key={w.task_id}>{w.task}: {w.gap}pts {w.direction}</span>
+              ))}
+              {mismatchWarnings.length > 3 && <Link to="/management" className="underline">View all →</Link>}
+            </div>
+          </div>
+        )}
         <div className="flex gap-6">
           {/* Task Table */}
           <div className="flex-1 bg-white rounded-2xl shadow-card border border-slate-200/60 overflow-hidden">
@@ -470,6 +506,7 @@ function App() {
                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Left</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Var</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Finish</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Stage</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-48">Progress</th>
                   </tr>
                 </thead>
@@ -538,7 +575,41 @@ function App() {
                           {task.finish_date}
                         </td>
                         <td className="px-4 py-3">
+                          {isParent ? (
+                            <span className="text-xs text-slate-400 italic">—</span>
+                          ) : (
+                            <select
+                              className={cn(
+                                "text-xs px-2 py-1 rounded-lg font-semibold border-none cursor-pointer focus:outline-none",
+                                task.cr_stage === 'resolved' ? "bg-green-100 text-green-700" :
+                                task.cr_stage === 'review' ? "bg-purple-100 text-purple-700" :
+                                task.cr_stage === 'implemented' ? "bg-blue-100 text-blue-700" :
+                                task.cr_stage === 'analyzed' ? "bg-amber-100 text-amber-700" :
+                                "bg-slate-100 text-slate-600"
+                              )}
+                              value={task.cr_stage || 'submitted'}
+                              onChange={async (e) => {
+                                await fetch(`${API_BASE}/tasks/${task.id}/stage`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ stage: e.target.value })
+                                })
+                                fetchData()
+                              }}
+                            >
+                              {Object.keys(crStages).map(s => (
+                                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
+                            {mismatchWarnings.some(w => w.task_id === task.id) && (
+                              <span className="text-amber-500 text-xs" title={mismatchWarnings.find(w => w.task_id === task.id)?.message}>
+                                ⚠️
+                              </span>
+                            )}
                             <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                               <div 
                                 className={cn(

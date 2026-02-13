@@ -26,8 +26,10 @@ from database import (
     get_resources,
     get_resource_allocation,
     get_summary,
+    get_mismatch_warnings,
     HOURS_PER_DAY,
     DEFAULT_PHASE_RATIOS,
+    CR_STAGE_MAP,
 )
 
 # Load environment
@@ -113,6 +115,13 @@ TASK_SCHEMA = {
         "editable": True,
         "description": "Current phase: 'development', 'testing', or 'review'",
         "values": ["development", "testing", "review"],
+    },
+    "cr_stage": {
+        "type": "str",
+        "editable": True,
+        "description": "CR lifecycle stage. Changing stage nudges percent_complete to suggested minimum.",
+        "values": list(CR_STAGE_MAP.keys()),
+        "stage_pct_map": CR_STAGE_MAP,
     },
     "start_date": {
         "type": "date",
@@ -206,6 +215,18 @@ def build_full_context() -> Dict[str, Any]:
                 }
             )
 
+    # Mismatch warnings
+    mismatches = get_mismatch_warnings()
+    for m in mismatches:
+        issues.append(
+            {
+                "type": "hours_progress_mismatch",
+                "task_id": m["task_id"],
+                "task_name": m["task"],
+                "message": m["message"],
+            }
+        )
+
     return {
         "tasks": tasks,
         "task_count": len(tasks),
@@ -215,6 +236,7 @@ def build_full_context() -> Dict[str, Any]:
         "parent_tasks": [t["task"] for t in parent_tasks],
         "subtask_map": subtask_map,
         "issues": issues,
+        "cr_stage_map": CR_STAGE_MAP,
         "today": datetime.now().strftime("%Y-%m-%d"),
     }
 
@@ -245,6 +267,9 @@ def build_task_context_string(tasks: List[Dict]) -> str:
         )
         lines.append(
             f"   Dates: {t.get('start_date', '?')} -> {t.get('finish_date', '?')} | Phase: {t.get('current_phase', 'development')}"
+        )
+        lines.append(
+            f"   CR Stage: {t.get('cr_stage', 'submitted')}"
         )
         if t.get("parent_task"):
             lines.append(f"   Parent: {t['parent_task']}")

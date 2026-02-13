@@ -5,8 +5,9 @@ Replaces CSV with proper database operations.
 """
 
 import sqlite3
+import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from contextlib import contextmanager
 
 DB_PATH = Path(__file__).parent.parent / "kpi_data.db"
@@ -15,6 +16,18 @@ HOURS_PER_DAY = 8
 
 # Default phase ratios (can be customized per lead)
 DEFAULT_PHASE_RATIOS = {"development": 0.65, "testing": 0.25, "review": 0.10}
+
+# CR Lifecycle stage-to-percentage guidance
+CR_STAGE_MAP = {
+    "submitted": {"percent": 0, "label": "Submitted / Not Started"},
+    "analyzed": {"percent": 20, "label": "Analyzed"},
+    "implemented": {"percent": 60, "label": "Implementation Done"},
+    "review": {"percent": 80, "label": "Review + Comment Fixes"},
+    "resolved": {"percent": 100, "label": "Resolved"},
+}
+
+# Mismatch threshold — flag when hours-implied progress vs reported % differ by more than this
+MISMATCH_THRESHOLD = 30  # percent points
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tasks (
@@ -105,6 +118,15 @@ CREATE TABLE IF NOT EXISTS milestones (
 
 CREATE INDEX IF NOT EXISTS idx_dep_pred ON task_dependencies(predecessor_id);
 CREATE INDEX IF NOT EXISTS idx_dep_succ ON task_dependencies(successor_id);
+
+CREATE TABLE IF NOT EXISTS baseline_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_name TEXT NOT NULL,
+    snapshot_date TEXT NOT NULL,
+    snapshot_type TEXT DEFAULT 'manual',  -- 'project_start', 'monthly', 'manual'
+    data TEXT NOT NULL,  -- JSON blob of all tasks at snapshot time
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -150,6 +172,7 @@ def _migrate_schema(conn):
         ("review_hours", "REAL DEFAULT 0"),
         ("review_percent", "REAL DEFAULT 0"),
         ("current_phase", "TEXT DEFAULT 'development'"),
+        ("cr_stage", "TEXT DEFAULT 'submitted'"),
     ]
 
     for col_name, col_def in migrations:
@@ -307,6 +330,7 @@ def update_task(task_id: int, updates: dict):
         "review_hours",
         "review_percent",
         "current_phase",
+        "cr_stage",
     }
 
     filtered = {k: v for k, v in updates.items() if k in allowed_fields}
@@ -1199,6 +1223,450 @@ def get_resource_load(weeks_ahead: int = 8):
         "load": load,
         "capacity_per_week": 40,
     }
+
+
+# ============================================================================
+# CR LIFECYCLE STAGE HELPERS
+# ============================================================================
+
+
+def update_cr_stage(task_id: int, new_stage: str):
+    """
+    Update the CR stage of a task and optionally nudge percent_complete
+    if it is below the stage's suggested minimum.
+    Returns the updated task dict.
+    """
+    stage = new_stage.lower()
+    if stage not in CR_STAGE_MAP:
+        return None
+
+    task = get_task(task_id)
+    if not task:
+        return None
+
+    updates = {"cr_stage": stage}
+    suggested_pct = CR_STAGE_MAP[stage]["percent"]
+    current_pct = task.get("percent_complete", 0) or 0
+
+    # Only nudge upward, never decrease
+    if current_pct < suggested_pct:
+        updates["percent_complete"] = suggested_pct
+
+    return update_task(task_id, updates)
+
+
+# ============================================================================
+# HOURS-VS-PROGRESS MISMATCH WARNINGS
+# ============================================================================
+
+
+def get_mismatch_warnings():
+    """
+    Return tasks where hours-implied progress and percent_complete differ
+    by more than MISMATCH_THRESHOLD.
+
+    hours_implied_pct = hours_completed / work_hours * 100
+    """
+    tasks = get_all_tasks()
+    warnings = []
+
+    for t in tasks:
+        work = t.get("work_hours") or 0
+        completed = t.get("hours_completed") or 0
+        pct = t.get("percent_complete") or 0
+
+        if work <= 0:
+            continue
+
+        hours_implied = round(completed / work * 100, 1)
+        gap = abs(hours_implied - pct)
+
+        if gap >= MISMATCH_THRESHOLD:
+            direction = "ahead" if hours_implied > pct else "behind"
+            warnings.append(
+                {
+                    "task_id": t["id"],
+                    "task": t["task"],
+                    "resource": t.get("resource", ""),
+                    "parent_task": t.get("parent_task", ""),
+                    "percent_complete": pct,
+                    "hours_implied_pct": hours_implied,
+                    "gap": round(gap, 1),
+                    "direction": direction,
+                    "work_hours": work,
+                    "hours_completed": completed,
+                    "hours_remaining": t.get("hours_remaining", 0),
+                    "message": (
+                        f"{t['task']}: Hours imply {hours_implied}% done but "
+                        f"reported at {pct}% ({direction} by {round(gap, 1)} pts)"
+                    ),
+                }
+            )
+
+    warnings.sort(key=lambda w: w["gap"], reverse=True)
+    return warnings
+
+
+# ============================================================================
+# BASELINE SNAPSHOTS
+# ============================================================================
+
+
+def save_baseline_snapshot(
+    snapshot_name: str, snapshot_type: str = "manual"
+) -> dict:
+    """
+    Save a snapshot of all current task data as a JSON blob.
+    snapshot_type: 'initial', 'monthly', 'manual'
+    """
+    tasks = get_all_tasks()
+    data_blob = json.dumps(tasks)
+
+    with get_db() as conn:
+        cursor = conn.execute(
+            """INSERT INTO baseline_snapshots
+               (snapshot_name, snapshot_date, snapshot_type, data)
+               VALUES (?, date('now'), ?, ?)""",
+            (snapshot_name, snapshot_type, data_blob),
+        )
+        conn.commit()
+        return {"id": cursor.lastrowid, "snapshot_name": snapshot_name}
+
+
+def get_baseline_snapshots() -> list:
+    """List all saved baseline snapshots (metadata only — no data blob)."""
+    with get_db() as conn:
+        rows = conn.execute(
+            """SELECT id, snapshot_name, snapshot_date, snapshot_type, created_at
+               FROM baseline_snapshots ORDER BY created_at DESC"""
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_baseline_snapshot(snapshot_id: int) -> dict | None:
+    """Load a single snapshot including its full data."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM baseline_snapshots WHERE id = ?", (snapshot_id,)
+        ).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        d["data"] = json.loads(d["data"])
+        return d
+
+
+def delete_baseline_snapshot(snapshot_id: int):
+    """Delete a baseline snapshot."""
+    with get_db() as conn:
+        conn.execute("DELETE FROM baseline_snapshots WHERE id = ?", (snapshot_id,))
+        conn.commit()
+        return True
+
+
+def compare_baseline(snapshot_id: int) -> dict:
+    """
+    Compare current task state against a saved baseline snapshot.
+    Returns per-task deltas for hours, percent, variance, and schedule.
+    """
+    snap = get_baseline_snapshot(snapshot_id)
+    if not snap:
+        return {"error": "Snapshot not found"}
+
+    baseline_tasks = {t["id"]: t for t in snap["data"]}
+    current_tasks = {t["id"]: t for t in get_all_tasks()}
+
+    deltas = []
+    for tid, cur in current_tasks.items():
+        base = baseline_tasks.get(tid)
+        if not base:
+            deltas.append(
+                {"task_id": tid, "task": cur["task"], "change": "added"}
+            )
+            continue
+
+        d = {
+            "task_id": tid,
+            "task": cur["task"],
+            "resource": cur.get("resource", ""),
+            "hours_delta": round(
+                (cur.get("work_hours") or 0) - (base.get("work_hours") or 0), 1
+            ),
+            "pct_delta": (cur.get("percent_complete") or 0)
+            - (base.get("percent_complete") or 0),
+            "variance_delta": round(
+                (cur.get("variance") or 0) - (base.get("variance") or 0), 1
+            ),
+            "schedule_slip_days": 0,
+        }
+
+        # Schedule slip
+        try:
+            cur_fin = datetime.strptime(cur["finish_date"], "%Y-%m-%d")
+            base_fin = datetime.strptime(base["finish_date"], "%Y-%m-%d")
+            d["schedule_slip_days"] = (cur_fin - base_fin).days
+        except Exception:
+            pass
+
+        # Only include if something changed
+        if (
+            d["hours_delta"] != 0
+            or d["pct_delta"] != 0
+            or d["variance_delta"] != 0
+            or d["schedule_slip_days"] != 0
+        ):
+            deltas.append(d)
+
+    # Tasks removed since baseline
+    for tid in baseline_tasks:
+        if tid not in current_tasks:
+            deltas.append(
+                {
+                    "task_id": tid,
+                    "task": baseline_tasks[tid]["task"],
+                    "change": "removed",
+                }
+            )
+
+    return {
+        "snapshot_name": snap["snapshot_name"],
+        "snapshot_date": snap["snapshot_date"],
+        "snapshot_type": snap["snapshot_type"],
+        "deltas": deltas,
+        "summary": {
+            "total_current_hours": sum(
+                t.get("work_hours", 0) or 0 for t in current_tasks.values()
+            ),
+            "total_baseline_hours": sum(
+                t.get("work_hours", 0) or 0 for t in baseline_tasks.values()
+            ),
+            "tasks_changed": len(deltas),
+        },
+    }
+
+
+# ============================================================================
+# WHAT-IF SCENARIO ENGINE
+# ============================================================================
+
+
+def what_if_remove_resource(resource_name: str, redistribute: bool = True):
+    """
+    Simulate removing a resource.  Returns projected impact without saving.
+    If redistribute=True, remaining hours spread across other resources in
+    the same parent project.
+    """
+    tasks = get_all_tasks()
+    affected = [t for t in tasks if t.get("resource") == resource_name]
+    other_resources = [
+        r["name"] for r in get_resources() if r["name"] != resource_name
+    ]
+
+    impact = {
+        "removed_resource": resource_name,
+        "affected_tasks": len(affected),
+        "orphaned_hours": sum(t.get("hours_remaining", 0) or 0 for t in affected),
+        "tasks": [],
+        "redistribution": [],
+    }
+
+    for t in affected:
+        impact["tasks"].append(
+            {
+                "id": t["id"],
+                "task": t["task"],
+                "hours_remaining": t.get("hours_remaining", 0),
+                "parent_task": t.get("parent_task", ""),
+            }
+        )
+
+    if redistribute and other_resources:
+        # Simple round-robin redistribution
+        for i, t in enumerate(affected):
+            new_owner = other_resources[i % len(other_resources)]
+            impact["redistribution"].append(
+                {
+                    "task_id": t["id"],
+                    "task": t["task"],
+                    "from": resource_name,
+                    "to": new_owner,
+                    "hours": t.get("hours_remaining", 0),
+                }
+            )
+
+    return impact
+
+
+def what_if_slip_schedule(weeks: int = 2):
+    """
+    Simulate slipping all unfinished tasks by N weeks.
+    Returns projected new dates without saving.
+    """
+    tasks = get_all_tasks()
+    slip_delta = timedelta(weeks=weeks)
+    changes = []
+
+    for t in tasks:
+        pct = t.get("percent_complete", 0) or 0
+        if pct >= 100:
+            continue
+        if not t.get("finish_date"):
+            continue
+
+        try:
+            old_finish = datetime.strptime(t["finish_date"], "%Y-%m-%d")
+        except ValueError:
+            try:
+                old_finish = datetime.strptime(t["finish_date"], "%m/%d/%Y")
+            except ValueError:
+                continue
+
+        new_finish = old_finish + slip_delta
+        changes.append(
+            {
+                "task_id": t["id"],
+                "task": t["task"],
+                "resource": t.get("resource", ""),
+                "percent_complete": pct,
+                "old_finish": old_finish.strftime("%Y-%m-%d"),
+                "new_finish": new_finish.strftime("%Y-%m-%d"),
+                "slip_days": weeks * 7,
+            }
+        )
+
+    return {
+        "weeks_slipped": weeks,
+        "tasks_affected": len(changes),
+        "changes": changes,
+    }
+
+
+def what_if_add_hours(task_id: int, extra_hours: float):
+    """
+    Simulate adding extra hours to a task — returns projected impact
+    on variance, finish date, and parent totals without saving.
+    """
+    task = get_task(task_id)
+    if not task:
+        return None
+
+    new_work = (task.get("work_hours") or 0) + extra_hours
+    new_variance = new_work - (task.get("baseline_hours") or 0)
+    remaining = new_work * (1 - (task.get("percent_complete") or 0) / 100)
+
+    new_finish = None
+    if task.get("start_date"):
+        new_finish = recalculate_finish_date(task["start_date"], remaining)
+
+    return {
+        "task_id": task_id,
+        "task": task["task"],
+        "current_work_hours": task.get("work_hours", 0),
+        "projected_work_hours": round(new_work, 1),
+        "current_variance": task.get("variance", 0),
+        "projected_variance": round(new_variance, 1),
+        "projected_remaining": round(remaining, 1),
+        "current_finish": task.get("finish_date"),
+        "projected_finish": new_finish,
+    }
+
+
+# ============================================================================
+# MANAGEMENT TIMELINE (HIGH-LEVEL PROJECT VIEW)
+# ============================================================================
+
+
+def get_management_timeline():
+    """
+    High-level timeline data for management: one row per parent project
+    showing earliest start, latest finish, overall %, total hours, status.
+    """
+    tasks = get_all_tasks()
+
+    # Group by parent_task (top-level projects are tasks with no parent)
+    projects = {}
+    for t in tasks:
+        parent = t.get("parent_task") or t["task"]
+        if parent not in projects:
+            projects[parent] = {
+                "project": parent,
+                "tasks": [],
+                "resources": set(),
+            }
+        projects[parent]["tasks"].append(t)
+        if t.get("resource"):
+            projects[parent]["resources"].add(t["resource"])
+
+    timeline = []
+    for name, proj in projects.items():
+        subtasks = proj["tasks"]
+        starts = []
+        finishes = []
+
+        for t in subtasks:
+            for fmt in ("%Y-%m-%d", "%m/%d/%Y"):
+                try:
+                    if t.get("start_date"):
+                        starts.append(datetime.strptime(t["start_date"], fmt))
+                    if t.get("finish_date"):
+                        finishes.append(datetime.strptime(t["finish_date"], fmt))
+                    break
+                except ValueError:
+                    continue
+
+        total_hours = sum(t.get("work_hours", 0) or 0 for t in subtasks)
+        total_remaining = sum(t.get("hours_remaining", 0) or 0 for t in subtasks)
+        total_baseline = sum(t.get("baseline_hours", 0) or 0 for t in subtasks)
+
+        avg_pct = (
+            sum(t.get("percent_complete", 0) or 0 for t in subtasks) / len(subtasks)
+            if subtasks
+            else 0
+        )
+
+        earliest = min(starts).strftime("%Y-%m-%d") if starts else None
+        latest = max(finishes).strftime("%Y-%m-%d") if finishes else None
+
+        # Status
+        if avg_pct >= 100:
+            status = "complete"
+        elif avg_pct > 0:
+            status = "in-progress"
+        else:
+            status = "not-started"
+
+        # Health: over-budget or behind schedule?
+        variance = total_hours - total_baseline
+        health = "on-track"
+        if variance > total_baseline * 0.1:
+            health = "over-budget"
+        if latest:
+            try:
+                fin = datetime.strptime(latest, "%Y-%m-%d")
+                if fin < datetime.now() and avg_pct < 100:
+                    health = "behind-schedule"
+            except ValueError:
+                pass
+
+        timeline.append(
+            {
+                "project": name,
+                "start_date": earliest,
+                "finish_date": latest,
+                "percent_complete": round(avg_pct, 1),
+                "total_hours": round(total_hours, 1),
+                "hours_remaining": round(total_remaining, 1),
+                "baseline_hours": round(total_baseline, 1),
+                "variance": round(variance, 1),
+                "task_count": len(subtasks),
+                "resources": sorted(proj["resources"]),
+                "status": status,
+                "health": health,
+            }
+        )
+
+    timeline.sort(key=lambda p: p.get("start_date") or "9999")
+    return timeline
 
 
 if __name__ == "__main__":

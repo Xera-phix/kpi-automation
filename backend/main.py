@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 import database
 import ai_service
+from database import CR_STAGE_MAP
 
 # Initialize
 app = FastAPI(
@@ -49,6 +50,7 @@ class TaskUpdate(BaseModel):
     percent_complete: Optional[int] = None
     task_type: Optional[str] = None
     parent_task: Optional[str] = None
+    cr_stage: Optional[str] = None
     # Phase fields
     dev_hours: Optional[float] = None
     test_hours: Optional[float] = None
@@ -260,6 +262,134 @@ def get_labor_forecast(months: int = 12):
 def get_resource_load(weeks: int = 8):
     """Get weekly resource load for overload detection."""
     return database.get_resource_load(weeks)
+
+
+# === CR Lifecycle Stage ===
+
+
+@app.patch("/api/tasks/{task_id}/stage")
+def update_task_stage(task_id: int, body: dict):
+    """Update the CR lifecycle stage of a task."""
+    stage = body.get("stage", "").lower()
+    if stage not in CR_STAGE_MAP:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid stage. Must be one of: {list(CR_STAGE_MAP.keys())}",
+        )
+    result = database.update_cr_stage(task_id, stage)
+    if not result:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    old_task = database.get_task(task_id)
+    database.log_change("STAGE", result["task"], result.get("resource", ""), f"Stage → {stage}")
+    return result
+
+
+@app.get("/api/cr-stages")
+def get_cr_stages():
+    """Return the CR stage map with suggested percentages."""
+    return CR_STAGE_MAP
+
+
+# === Mismatch Warnings ===
+
+
+@app.get("/api/mismatch-warnings")
+def get_mismatch_warnings():
+    """Get tasks with hours-vs-progress mismatch."""
+    return database.get_mismatch_warnings()
+
+
+# === Baseline Snapshots ===
+
+
+class BaselineCreate(BaseModel):
+    name: str
+    snapshot_type: str = "manual"  # initial, monthly, manual
+
+
+@app.post("/api/baselines")
+def create_baseline(body: BaselineCreate):
+    """Save a project baseline snapshot."""
+    return database.save_baseline_snapshot(body.name, body.snapshot_type)
+
+
+@app.get("/api/baselines")
+def list_baselines():
+    """List all saved baselines."""
+    return database.get_baseline_snapshots()
+
+
+@app.get("/api/baselines/{snapshot_id}")
+def get_baseline(snapshot_id: int):
+    """Get a single baseline snapshot with full data."""
+    snap = database.get_baseline_snapshot(snapshot_id)
+    if not snap:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    return snap
+
+
+@app.get("/api/baselines/{snapshot_id}/compare")
+def compare_baseline(snapshot_id: int):
+    """Compare current state against a saved baseline."""
+    result = database.compare_baseline(snapshot_id)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.delete("/api/baselines/{snapshot_id}")
+def delete_baseline(snapshot_id: int):
+    """Delete a baseline snapshot."""
+    database.delete_baseline_snapshot(snapshot_id)
+    return {"success": True}
+
+
+# === What-If Scenarios ===
+
+
+class WhatIfRemoveResource(BaseModel):
+    resource: str
+    redistribute: bool = True
+
+
+class WhatIfSlipSchedule(BaseModel):
+    weeks: int = 2
+
+
+class WhatIfAddHours(BaseModel):
+    task_id: int
+    extra_hours: float
+
+
+@app.post("/api/what-if/remove-resource")
+def what_if_remove_resource(body: WhatIfRemoveResource):
+    """Simulate removing a resource from the project."""
+    return database.what_if_remove_resource(body.resource, body.redistribute)
+
+
+@app.post("/api/what-if/slip-schedule")
+def what_if_slip_schedule(body: WhatIfSlipSchedule):
+    """Simulate slipping all unfinished tasks by N weeks."""
+    return database.what_if_slip_schedule(body.weeks)
+
+
+@app.post("/api/what-if/add-hours")
+def what_if_add_hours(body: WhatIfAddHours):
+    """Simulate adding hours to a task."""
+    result = database.what_if_add_hours(body.task_id, body.extra_hours)
+    if not result:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return result
+
+
+# === Management Timeline ===
+
+
+@app.get("/api/management-timeline")
+def get_management_timeline():
+    """High-level project timeline for management view."""
+    return database.get_management_timeline()
 
 
 # === Startup ===
