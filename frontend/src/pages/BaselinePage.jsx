@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowLeft, Camera, Trash2, GitCompare, Plus, Calendar, Database } from 'lucide-react'
+import { Camera, Trash2, GitCompare, Plus, Calendar, Database } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const API_BASE = '/api'
@@ -48,23 +47,7 @@ export default function BaselinePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
-      {/* Header */}
-      <header className="bg-[#11111198] backdrop-blur-xl border-b border-white/[0.08] text-white">
-        <div className="max-w-[1400px] mx-auto px-6 py-4 flex items-center gap-4">
-          <Link to="/" className="p-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div className="p-2 bg-white/10 rounded-lg">
-            <Database className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold">Baseline Snapshots</h1>
-            <p className="text-white/40 text-sm">Save & compare project state over time</p>
-          </div>
-        </div>
-      </header>
-
+    <div className="h-full overflow-auto">
       <div className="max-w-[1400px] mx-auto px-6 py-6 space-y-6">
         {/* Create New */}
         <div className="bg-[#11111198] backdrop-blur-sm rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08] p-6">

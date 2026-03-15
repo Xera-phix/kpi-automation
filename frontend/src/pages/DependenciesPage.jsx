@@ -1,7 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
 import {
-  ArrowLeft,
   GitBranch,
   Users,
   AlertTriangle,
@@ -121,40 +119,28 @@ export default function DependenciesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
-      {/* Header */}
-      <header className="bg-[#11111198] backdrop-blur-xl border-b border-white/[0.08] text-white shrink-0">
-        <div className="max-w-[1920px] mx-auto px-6 py-3 flex items-center gap-4">
-          <Link to="/" className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div className="flex items-center gap-2">
-            <GitBranch className="w-5 h-5 text-white/40" />
-            <h1 className="text-lg font-semibold">Dependencies & Resource Load</h1>
-            <span className="ml-2 px-2 py-0.5 bg-amber-400/20 text-amber-300 text-xs rounded-full font-medium">POC</span>
-          </div>
-
-          <div className="flex items-center gap-2 ml-auto">
-            {/* Tab Toggle */}
-            <div className="flex bg-white/[0.06] rounded-lg p-0.5">
-              {[
-                { key: 'overview', icon: Shield, label: 'Overview' },
-                { key: 'blockers', icon: GitBranch, label: 'Blockers' },
-                { key: 'load', icon: Users, label: 'Resource Load' },
-              ].map(tab => (
-                <button
-                  key={tab.key}
-                  className={cn("px-3 py-1.5 text-xs rounded-md transition-all font-medium flex items-center gap-1",
-                    activeTab === tab.key ? "bg-white/15 text-white" : "text-white/50 hover:text-white")}
-                  onClick={() => setActiveTab(tab.key)}
-                >
+    <div className="h-full flex flex-col">
+      {/* Tab Bar */}
+      <div className="bg-[#11111198] backdrop-blur-xl border-b border-white/[0.06] shrink-0">
+        <div className="max-w-[1920px] mx-auto px-6 py-2 flex items-center gap-4">
+          <div className="flex bg-white/[0.06] rounded-lg p-0.5">
+            {[
+              { key: 'overview', icon: Shield, label: 'Overview' },
+              { key: 'blockers', icon: GitBranch, label: 'Blockers' },
+              { key: 'load', icon: Users, label: 'Resource Load' },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                className={cn("px-3 py-1.5 text-xs rounded-md transition-all font-medium flex items-center gap-1",
+                  activeTab === tab.key ? "bg-white/15 text-white" : "text-white/50 hover:text-white")}
+                onClick={() => setActiveTab(tab.key)}
+              >
                   <tab.icon className="w-3 h-3" /> {tab.label}
                 </button>
               ))}
             </div>
-          </div>
         </div>
-      </header>
+      </div>
 
       {/* Content */}
       <div className="flex-1 max-w-[1400px] w-full mx-auto px-6 py-6 overflow-auto">

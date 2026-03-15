@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Chart as ChartJS,
@@ -20,20 +20,13 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
-  MessageSquare,
   Send,
   Sparkles,
   TrendingUp,
-  Users,
   Zap,
   CheckCircle2,
   AlertTriangle,
   X,
-  Calendar,
-  GitBranch,
-  Briefcase,
-  Database,
-  FlaskConical,
 } from 'lucide-react'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Filler, Tooltip, Legend)
@@ -53,6 +46,7 @@ function App() {
   ])
   const [chatInput, setChatInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [dataLoading, setDataLoading] = useState(true)
   const [toast, setToast] = useState(null)
   const [pendingAction, setPendingAction] = useState(null)
   const [selectedProject, setSelectedProject] = useState(null)
@@ -62,6 +56,7 @@ function App() {
   const [mismatchWarnings, setMismatchWarnings] = useState([])
   const [crStages, setCrStages] = useState({})
   const chatRef = useRef(null)
+  const tableContainerRef = useRef(null)
 
   // Fetch all data
   const fetchData = async () => {
@@ -84,6 +79,8 @@ function App() {
       setCrStages(await stagesRes.json())
     } catch (err) {
       showToast('Failed to load data', 'error')
+    } finally {
+      setDataLoading(false)
     }
   }
 
@@ -403,257 +400,267 @@ function App() {
 
   const variance = summary.total_variance || 0
 
-  return (
-    <div className="min-h-screen bg-[#0a0a0a]">
-      {/* Header */}
-      <header className="bg-[#11111198] backdrop-blur-xl border-b border-white/[0.08] text-white">
-        <div className="max-w-[1800px] mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
-              <BarChart3 className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight">KPI Project Tracker</h1>
-              <p className="text-white/40 text-sm">Schedule-IKP • Software Development</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 text-sm text-white/40">
-            <Link to="/timeline" className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] hover:bg-white/[0.12] rounded-lg transition-colors border border-white/[0.06]">
-              <Calendar className="w-4 h-4" />
-              <span className="font-medium text-white">Timeline</span>
-              <span className="px-1.5 py-0.5 bg-amber-400/20 text-amber-300 rounded text-[10px] font-bold">POC</span>
-            </Link>
-            <Link to="/dependencies" className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] hover:bg-white/[0.12] rounded-lg transition-colors border border-white/[0.06]">
-              <GitBranch className="w-4 h-4" />
-              <span className="font-medium text-white">Dependencies</span>
-              <span className="px-1.5 py-0.5 bg-amber-400/20 text-amber-300 rounded text-[10px] font-bold">POC</span>
-            </Link>
-            <Link to="/management" className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] hover:bg-white/[0.12] rounded-lg transition-colors border border-white/[0.06]">
-              <Briefcase className="w-4 h-4" />
-              <span className="font-medium text-white">Management</span>
-            </Link>
-            <Link to="/baselines" className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] hover:bg-white/[0.12] rounded-lg transition-colors border border-white/[0.06]">
-              <Database className="w-4 h-4" />
-              <span className="font-medium text-white">Baselines</span>
-            </Link>
-            <Link to="/what-if" className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] hover:bg-white/[0.12] rounded-lg transition-colors border border-white/[0.06]">
-              <FlaskConical className="w-4 h-4" />
-              <span className="font-medium text-white">What-If</span>
-            </Link>
-            <span className="px-3 py-1 bg-white/10 rounded-full text-xs font-medium">v2.2</span>
-          </div>
-        </div>
-      </header>
+  // Virtualizer for the task table
+  const rowVirtualizer = useVirtualizer({
+    count: tasks.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 48,
+    overscan: 8,
+  })
+  const virtualRows = rowVirtualizer.getVirtualItems()
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0
+  const paddingBottom = virtualRows.length > 0
+    ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
+    : 0
 
-      {/* Stats Bar */}
-      <div className="bg-[#11111198] backdrop-blur-sm border-b border-white/[0.06] sticky top-0 z-10">
-        <div className="max-w-[1800px] mx-auto px-6 py-4">
-          <div className="flex items-center gap-8">
-            <StatCard icon={<CheckCircle2 className="w-5 h-5" />} value={summary.total_tasks || 0} label="Tasks" />
-            <StatCard icon={<Clock className="w-5 h-5" />} value={`${Math.round(summary.total_completed || 0).toLocaleString()}h`} label="Completed" color="green" />
-            <StatCard icon={<TrendingUp className="w-5 h-5" />} value={`${Math.round(summary.total_remaining || 0).toLocaleString()}h`} label="Remaining" color="blue" />
-            <StatCard 
-              icon={variance > 0 ? <AlertTriangle className="w-5 h-5" /> : <Zap className="w-5 h-5" />} 
-              value={`${variance > 0 ? '+' : ''}${Math.round(variance).toLocaleString()}h`} 
-              label="Variance" 
-              color={variance > 0 ? 'red' : variance < 0 ? 'green' : 'gray'} 
-            />
-            <StatCard icon={<Sparkles className="w-5 h-5" />} value={`${Math.round(summary.total_earned_value || 0).toLocaleString()}h`} label="Earned Value" color="purple" />
-            
-            {/* Mini S-Curve */}
-            <div className="flex-1 max-w-xs h-16 ml-auto">
-              <Line 
-                data={chartData} 
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: { legend: { display: false } },
-                  scales: { x: { display: false }, y: { display: false } }
-                }} 
-              />
+  return (
+    <div className="flex flex-col h-full">
+      {/* Stats Bar - sticky inside the scrolling layout main */}
+      <div className="bg-[#11111198] backdrop-blur-sm border-b border-white/[0.06] sticky top-0 z-10 shrink-0">
+        <div className="px-6 py-3">
+          {dataLoading ? (
+            <div className="flex items-center gap-8">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-white/[0.06] animate-pulse" />
+                  <div className="space-y-1.5">
+                    <div className="w-16 h-4 rounded bg-white/[0.06] animate-pulse" />
+                    <div className="w-12 h-3 rounded bg-white/[0.04] animate-pulse" />
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center gap-8">
+              <StatCard icon={<CheckCircle2 className="w-5 h-5" />} value={summary.total_tasks || 0} label="Tasks" />
+              <StatCard icon={<Clock className="w-5 h-5" />} value={`${Math.round(summary.total_completed || 0).toLocaleString()}h`} label="Completed" color="green" />
+              <StatCard icon={<TrendingUp className="w-5 h-5" />} value={`${Math.round(summary.total_remaining || 0).toLocaleString()}h`} label="Remaining" color="blue" />
+              <StatCard
+                icon={variance > 0 ? <AlertTriangle className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
+                value={`${variance > 0 ? '+' : ''}${Math.round(variance).toLocaleString()}h`}
+                label="Variance"
+                color={variance > 0 ? 'red' : variance < 0 ? 'green' : 'gray'}
+              />
+              <StatCard icon={<Sparkles className="w-5 h-5" />} value={`${Math.round(summary.total_earned_value || 0).toLocaleString()}h`} label="Earned Value" color="purple" />
+
+              {/* Mini S-Curve */}
+              <div className="flex-1 max-w-xs h-14 ml-auto">
+                <Line
+                  data={chartData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { display: false }, y: { display: false } }
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-[1800px] mx-auto px-6 py-6">
-        {/* Mismatch Warnings Banner */}
-        {mismatchWarnings.length > 0 && (
-          <div className="mb-4 bg-amber-500/10 border border-amber-500/20 rounded-xl px-5 py-3">
-            <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold mb-1">
-              <AlertTriangle className="w-4 h-4" />
-              {mismatchWarnings.length} Hours vs Progress Mismatch{mismatchWarnings.length > 1 ? 'es' : ''}
+      <div className="flex-1 px-6 py-5 flex gap-5 min-h-0">
+        {/* Task Table */}
+        <div className="flex-1 bg-[#11111198] backdrop-blur-sm rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08] overflow-hidden flex flex-col min-w-0">
+          {/* Mismatch Warnings Banner */}
+          {mismatchWarnings.length > 0 && (
+            <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-2.5 shrink-0">
+              <div className="flex items-center gap-2 text-amber-400 text-xs font-semibold">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {mismatchWarnings.length} Hours vs Progress Mismatch{mismatchWarnings.length > 1 ? 'es' : ''}:
+                <span className="font-normal text-amber-400/70">
+                  {mismatchWarnings.slice(0, 3).map(w => `${w.task}: ${w.gap}pts ${w.direction}`).join(' • ')}
+                  {mismatchWarnings.length > 3 && ' …'}
+                </span>
+              </div>
             </div>
-            <div className="text-xs text-amber-400/70 space-x-4">
-              {mismatchWarnings.slice(0, 3).map(w => (
-                <span key={w.task_id}>{w.task}: {w.gap}pts {w.direction}</span>
-              ))}
-              {mismatchWarnings.length > 3 && <Link to="/management" className="underline">View all →</Link>}
-            </div>
-          </div>
-        )}
-        <div className="flex gap-6">
-          {/* Task Table */}
-          <div className="flex-1 bg-[#11111198] backdrop-blur-sm rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08] overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-white/[0.03] border-b border-white/[0.06]">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">ID</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Task</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Resource</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Work</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Done</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Left</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Var</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Finish</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Stage</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider w-48">Progress</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/[0.04]">
-                  {tasks.map(task => {
-                    const isParent = tasks.some(t => t.parent_task === task.task)
-                    const isChild = !!task.parent_task
-                    const taskVariance = task.variance || 0
-                    
-                    return (
-                      <tr 
-                        key={task.id} 
-                        className={cn(
-                          "hover:bg-white/[0.04] transition-colors",
-                          isParent && "bg-white/[0.03] border-l-2 border-l-blue-500/50",
-                          isChild && ""
-                        )}
-                      >
-                        <td className={cn("px-4 py-3 text-sm", isParent ? "text-blue-400 font-semibold" : "text-white/30")}>
-                          {task.id}
+          )}
+
+          {/* Virtualized Table */}
+          <div
+            ref={tableContainerRef}
+            className="overflow-auto flex-1"
+          >
+            <table className="w-full border-collapse">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-[#0f0f0f] border-b border-white/[0.06]">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">ID</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Task</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Resource</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Work</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Done</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Left</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Var</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Finish</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Stage</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider w-48">Progress</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {dataLoading ? (
+                  [...Array(12)].map((_, i) => (
+                    <tr key={i} className="border-b border-white/[0.04]">
+                      {[...Array(10)].map((__, j) => (
+                        <td key={j} className="px-4 py-3">
+                          <div className="h-4 rounded bg-white/[0.06] animate-pulse" style={{ width: j === 1 ? '80%' : j === 2 ? '60%' : '50%' }} />
                         </td>
-                        <td className="px-4 py-3">
-                          <span className={cn(
-                            "text-sm flex items-center",
-                            isChild && "pl-6",
-                            isParent && "font-semibold text-white"
-                          )}>
-                            {isChild && <span className="text-white/20 mr-1.5 text-xs">└─</span>}
-                            {isParent && <span className="mr-1.5 text-blue-400">▸</span>}
-                            <span className={isChild ? "text-white/70" : ""}>{task.task}</span>
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          {isParent ? (
-                            <span className="text-xs text-white/30 italic">auto</span>
-                          ) : (
-                            <select
-                              className="text-sm bg-[#111111] border border-white/10 rounded text-white/60 cursor-pointer hover:text-blue-400 focus:outline-none px-1"
-                              value={task.resource || ''}
-                              onChange={(e) => updateTask(task.id, 'resource', e.target.value)}
-                            >
-                              {resources.map(r => (
-                                <option key={r.name} value={r.name}>{r.name}</option>
-                              ))}
-                            </select>
+                      ))}
+                    </tr>
+                  ))
+                ) : (
+                  <>
+                    {paddingTop > 0 && (
+                      <tr><td colSpan={10} style={{ height: `${paddingTop}px`, padding: 0 }} /></tr>
+                    )}
+                    {virtualRows.map(virtualRow => {
+                      const task = tasks[virtualRow.index]
+                      const isParent = tasks.some(t => t.parent_task === task.task)
+                      const isChild = !!task.parent_task
+                      const taskVariance = task.variance || 0
+
+                      return (
+                        <tr
+                          key={task.id}
+                          className={cn(
+                            'hover:bg-white/[0.04] transition-colors',
+                            isParent && 'bg-white/[0.03] border-l-2 border-l-blue-500/50',
                           )}
-                        </td>
-                        <td className={cn("px-4 py-3 text-sm text-right font-medium", isParent ? "text-white" : "text-white/70")}>
-                          {Math.round(task.work_hours)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right text-green-400 font-medium">
-                          {Math.round(task.hours_completed || 0)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right text-blue-400">
-                          {Math.round(task.hours_remaining || task.work_hours)}
-                        </td>
-                        <td className={cn(
-                          "px-4 py-3 text-sm text-right font-medium",
-                          taskVariance > 0 && "text-red-400",
-                          taskVariance < 0 && "text-green-400",
-                          taskVariance === 0 && "text-white/30"
-                        )}>
-                          {taskVariance > 0 ? '+' : ''}{Math.round(taskVariance)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-white/50">
-                        </td>
-                        <td className="px-4 py-3">
-                          {isParent ? (
-                            <span className="text-xs text-white/30 italic">—</span>
-                          ) : (
-                            <select
-                              className={cn(
-                                "text-xs px-2 py-1 rounded-lg font-semibold border border-white/10 cursor-pointer focus:outline-none bg-[#111111]",
-                                task.cr_stage === 'resolved' ? "bg-green-500/20 text-green-400" :
-                                task.cr_stage === 'review' ? "bg-purple-500/20 text-purple-400" :
-                                task.cr_stage === 'implemented' ? "bg-blue-500/20 text-blue-400" :
-                                task.cr_stage === 'analyzed' ? "bg-amber-500/20 text-amber-400" :
-                                "bg-white/10 text-white/50"
-                              )}
-                              value={task.cr_stage || 'submitted'}
-                              onChange={async (e) => {
-                                await fetch(`${API_BASE}/tasks/${task.id}/stage`, {
-                                  method: 'PATCH',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ stage: e.target.value })
-                                })
-                                fetchData()
-                              }}
-                            >
-                              {Object.keys(crStages).map(s => (
-                                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                              ))}
-                            </select>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            {mismatchWarnings.some(w => w.task_id === task.id) && (
-                              <span className="text-amber-500 text-xs" title={mismatchWarnings.find(w => w.task_id === task.id)?.message}>
-                                ⚠️
-                              </span>
-                            )}
-                            <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
-                              <div 
-                                className={cn(
-                                  "h-full rounded-full transition-all duration-300",
-                                  task.percent_complete >= 100 ? "bg-green-500" :
-                                  task.percent_complete >= 75 ? "bg-blue-500" :
-                                  task.percent_complete >= 50 ? "bg-blue-400" :
-                                  task.percent_complete >= 25 ? "bg-amber-400" : "bg-white/20"
-                                )}
-                                style={{ width: `${task.percent_complete}%` }}
-                              />
-                            </div>
+                        >
+                          <td className={cn('px-4 py-3 text-sm', isParent ? 'text-blue-400 font-semibold' : 'text-white/30')}>
+                            {task.id}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={cn(
+                              'text-sm flex items-center',
+                              isChild && 'pl-6',
+                              isParent && 'font-semibold text-white'
+                            )}>
+                              {isChild && <span className="text-white/20 mr-1.5 text-xs">└─</span>}
+                              {isParent && <span className="mr-1.5 text-blue-400">▸</span>}
+                              <span className={isChild ? 'text-white/70' : ''}>{task.task}</span>
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
                             {isParent ? (
-                              <span className="text-xs font-semibold text-white/60 w-10 text-right">
-                                {task.percent_complete}%
-                              </span>
+                              <span className="text-xs text-white/30 italic">auto</span>
                             ) : (
-                              <>
-                                <input
-                                  type="range"
-                                  min="0"
-                                  max="100"
-                                  value={task.percent_complete}
-                                  className="w-16 h-1 accent-blue-500 cursor-pointer opacity-0 hover:opacity-100 absolute"
-                                  onChange={(e) => updateTask(task.id, 'percent_complete', parseInt(e.target.value))}
+                              <select
+                                className="text-sm bg-[#111111] border border-white/10 rounded text-white/60 cursor-pointer hover:text-blue-400 focus:outline-none px-1"
+                                value={task.resource || ''}
+                                onChange={(e) => updateTask(task.id, 'resource', e.target.value)}
+                              >
+                                {resources.map(r => (
+                                  <option key={r.name} value={r.name}>{r.name}</option>
+                                ))}
+                              </select>
+                            )}
+                          </td>
+                          <td className={cn('px-4 py-3 text-sm text-right font-medium', isParent ? 'text-white' : 'text-white/70')}>
+                            {Math.round(task.work_hours)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right text-green-400 font-medium">
+                            {Math.round(task.hours_completed || 0)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right text-blue-400">
+                            {Math.round(task.hours_remaining || task.work_hours)}
+                          </td>
+                          <td className={cn(
+                            'px-4 py-3 text-sm text-right font-medium',
+                            taskVariance > 0 && 'text-red-400',
+                            taskVariance < 0 && 'text-green-400',
+                            taskVariance === 0 && 'text-white/30'
+                          )}>
+                            {taskVariance > 0 ? '+' : ''}{Math.round(taskVariance)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-white/50">
+                            {task.finish_date ? new Date(task.finish_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            {isParent ? (
+                              <span className="text-xs text-white/30 italic">—</span>
+                            ) : (
+                              <select
+                                className={cn(
+                                  'text-xs px-2 py-1 rounded-lg font-semibold border border-white/10 cursor-pointer focus:outline-none bg-[#111111]',
+                                  task.cr_stage === 'resolved' ? 'bg-green-500/20 text-green-400' :
+                                  task.cr_stage === 'review' ? 'bg-purple-500/20 text-purple-400' :
+                                  task.cr_stage === 'implemented' ? 'bg-blue-500/20 text-blue-400' :
+                                  task.cr_stage === 'analyzed' ? 'bg-amber-500/20 text-amber-400' :
+                                  'bg-white/10 text-white/50'
+                                )}
+                                value={task.cr_stage || 'submitted'}
+                                onChange={async (e) => {
+                                  await fetch(`${API_BASE}/tasks/${task.id}/stage`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ stage: e.target.value })
+                                  })
+                                  fetchData()
+                                }}
+                              >
+                                {Object.keys(crStages).map(s => (
+                                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                                ))}
+                              </select>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              {mismatchWarnings.some(w => w.task_id === task.id) && (
+                                <span className="text-amber-500 text-xs" title={mismatchWarnings.find(w => w.task_id === task.id)?.message}>
+                                  ⚠️
+                                </span>
+                              )}
+                              <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                                <div
+                                  className={cn(
+                                    'h-full rounded-full transition-all duration-300',
+                                    task.percent_complete >= 100 ? 'bg-green-500' :
+                                    task.percent_complete >= 75 ? 'bg-blue-500' :
+                                    task.percent_complete >= 50 ? 'bg-blue-400' :
+                                    task.percent_complete >= 25 ? 'bg-amber-400' : 'bg-white/20'
+                                  )}
+                                  style={{ width: `${task.percent_complete}%` }}
                                 />
-                                <span className="text-xs font-medium text-white/40 w-10 text-right">
+                              </div>
+                              {isParent ? (
+                                <span className="text-xs font-semibold text-white/60 w-10 text-right">
                                   {task.percent_complete}%
                                 </span>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                              ) : (
+                                <>
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    value={task.percent_complete}
+                                    className="w-16 h-1 accent-blue-500 cursor-pointer opacity-0 hover:opacity-100 absolute"
+                                    onChange={(e) => updateTask(task.id, 'percent_complete', parseInt(e.target.value))}
+                                  />
+                                  <span className="text-xs font-medium text-white/40 w-10 text-right">
+                                    {task.percent_complete}%
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {paddingBottom > 0 && (
+                      <tr><td colSpan={10} style={{ height: `${paddingBottom}px`, padding: 0 }} /></tr>
+                    )}
+                  </>
+                )}
+              </tbody>
+            </table>
           </div>
+        </div>
 
-          {/* Right Panel - Chat & Analytics */}
-          <div className="w-96 flex flex-col gap-4" style={{ height: 'calc(100vh - 180px)' }}>
+        {/* Right Panel - Chat & Analytics */}
+        <div className="w-96 flex flex-col gap-4 shrink-0" style={{ height: '100%' }}>
             {/* AI Chat Panel - Always visible at top */}
             <div className="bg-[#11111198] backdrop-blur-sm rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08] overflow-hidden flex flex-col" style={{ minHeight: '350px', flex: showCharts ? '1 1 350px' : '1 1 auto' }}>
               <div className="px-5 py-3 border-b border-white/[0.06] flex items-center gap-2 shrink-0">
@@ -822,7 +829,6 @@ function App() {
 
           </div>
         </div>
-      </div>
 
       {/* Toast */}
       {toast && (

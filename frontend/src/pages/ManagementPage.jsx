@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowLeft, Briefcase, ChevronRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const API_BASE = '/api'
@@ -49,22 +48,7 @@ export default function ManagementPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
-      <header className="bg-[#11111198] backdrop-blur-xl border-b border-white/[0.08] text-white">
-        <div className="max-w-[1400px] mx-auto px-6 py-4 flex items-center gap-4">
-          <Link to="/" className="p-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div className="p-2 bg-white/10 rounded-lg">
-            <Briefcase className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold">Management Timeline</h1>
-            <p className="text-white/40 text-sm">High-level project overview for stakeholders</p>
-          </div>
-        </div>
-      </header>
-
+    <div className="h-full overflow-auto">
       <div className="max-w-[1400px] mx-auto px-6 py-6 space-y-6">
         {/* Project Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
