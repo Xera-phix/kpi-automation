@@ -58,8 +58,15 @@
   "effects": {
     "cardShadow": "0 18px 42px -24px rgba(2, 6, 23, 0.85)",
     "panelShadow": "0 0 0 1px rgba(148, 163, 184, 0.12), 0 14px 36px -24px rgba(2, 6, 23, 0.8)",
-    "backdropBlur": "14px",
+    "backdropBlur": "blur(14px)",
     "surfaceBorder": "rgba(148, 163, 184, 0.16)",
-    "subtleBorder": "rgba(148, 163, 184, 0.10)"
+    "subtleBorder": "rgba(148, 163, 184, 0.10)",
+    "elevatedSoft": "rgba(35, 42, 66, 0.60)",
+    "elevatedSoftAlt": "rgba(35, 42, 66, 0.30)",
+    "focusRing": "rgba(124, 77, 255, 0.50)",
+    "accentGlow": "rgba(124, 77, 255, 0.30)",
+    "surfaceOpacity": 0.88,
+    "panelOpacity": 0.92,
+    "tableHeaderOpacity": 0.75
   }
 }

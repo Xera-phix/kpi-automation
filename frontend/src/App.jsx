@@ -684,7 +684,7 @@ function App() {
                       "max-w-[85%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed",
                       msg.role === 'user' 
                         ? "bg-blue-500 text-white rounded-br-md" 
-                        : "bg-[rgba(35,42,66,0.6)] text-[var(--theme-text-body)] rounded-bl-md",
+                        : "bg-[var(--theme-elevated-soft)] text-[var(--theme-text-body)] rounded-bl-md",
                       msg.loading && "animate-pulse"
                     )}>
                       {msg.content}
@@ -714,11 +714,11 @@ function App() {
                 )}
               </div>
               
-              <div className="p-3 border-t border-[var(--theme-border-subtle)] bg-[rgba(35,42,66,0.3)] shrink-0">
+              <div className="p-3 border-t border-[var(--theme-border-subtle)] bg-[var(--theme-elevated-soft-alt)] shrink-0">
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    className="flex-1 px-4 py-2.5 bg-[rgba(35,42,66,0.6)] border border-[var(--theme-border-subtle)] rounded-[var(--theme-radius-control)] text-sm text-[var(--theme-text-body)] focus:outline-none focus:ring-2 focus:ring-[rgba(124,77,255,0.5)] focus:border-transparent placeholder-[var(--theme-text-muted)]"
+                    className="flex-1 px-4 py-2.5 bg-[var(--theme-elevated-soft)] border border-[var(--theme-border-subtle)] rounded-[var(--theme-radius-control)] text-sm text-[var(--theme-text-body)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)] focus:border-transparent placeholder-[var(--theme-text-muted)]"
                     placeholder={pendingAction ? "Choose an option..." : "Type instructions..."}
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
@@ -730,7 +730,7 @@ function App() {
                        "px-4 py-2.5 rounded-[var(--theme-radius-control)] font-medium text-sm transition-all flex items-center gap-2",
                       loading || pendingAction || !chatInput.trim()
                         ? "bg-white/[0.06] text-white/30 cursor-not-allowed"
-                         : "bg-[var(--theme-accent-primary)] text-white hover:brightness-110 shadow-[0_0_15px_rgba(124,77,255,0.3)]"
+                         : "bg-[var(--theme-accent-primary)] text-white hover:brightness-110 shadow-[0_0_15px_var(--theme-accent-glow)]"
                     )}
                     onClick={sendChat} 
                     disabled={loading || pendingAction || !chatInput.trim()}
@@ -847,11 +847,11 @@ function App() {
 // Stat Card Component
 function StatCard({ icon, value, label, color = 'blue' }) {
   const colorClasses = {
-    blue: 'text-blue-300 bg-blue-500/15',
+    blue: 'text-[var(--theme-accent-info)] bg-blue-500/15',
     green: 'text-green-400 bg-green-500/15',
     red: 'text-red-400 bg-red-500/15',
     purple: 'text-purple-400 bg-purple-500/15',
-    gray: 'text-[var(--theme-text-muted)] bg-[rgba(35,42,66,0.6)]',
+    gray: 'text-[var(--theme-text-muted)] bg-[var(--theme-elevated-soft)]',
   }
   
   return (

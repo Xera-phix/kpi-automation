@@ -33,6 +33,7 @@ export default function Layout({ children }) {
     root.style.setProperty('--theme-bg-surface', designTokens.colorPalette.background.surface.hex)
     root.style.setProperty('--theme-bg-elevated', designTokens.colorPalette.background.elevated.hex)
     root.style.setProperty('--theme-accent-primary', designTokens.colorPalette.primary.hex)
+    root.style.setProperty('--theme-accent-info', designTokens.colorPalette.accent.info.hex)
     root.style.setProperty('--theme-text-heading', designTokens.colorPalette.text.heading)
     root.style.setProperty('--theme-text-body', designTokens.colorPalette.text.body)
     root.style.setProperty('--theme-text-muted', designTokens.colorPalette.text.muted)
@@ -44,6 +45,13 @@ export default function Layout({ children }) {
     root.style.setProperty('--theme-backdrop-blur', designTokens.effects.backdropBlur)
     root.style.setProperty('--theme-border-surface', designTokens.effects.surfaceBorder)
     root.style.setProperty('--theme-border-subtle', designTokens.effects.subtleBorder)
+    root.style.setProperty('--theme-elevated-soft', designTokens.effects.elevatedSoft)
+    root.style.setProperty('--theme-elevated-soft-alt', designTokens.effects.elevatedSoftAlt)
+    root.style.setProperty('--theme-focus-ring', designTokens.effects.focusRing)
+    root.style.setProperty('--theme-accent-glow', designTokens.effects.accentGlow)
+    root.style.setProperty('--theme-opacity-surface', String(designTokens.effects.surfaceOpacity))
+    root.style.setProperty('--theme-opacity-panel', String(designTokens.effects.panelOpacity))
+    root.style.setProperty('--theme-opacity-table-header', String(designTokens.effects.tableHeaderOpacity))
   }, [])
 
   const currentPage = NAV_ITEMS.find(item =>
