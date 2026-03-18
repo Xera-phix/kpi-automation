@@ -1,46 +1,46 @@
 {
   "meta": {
-    "name": "godly-dark-dashboard",
-    "source": "https://github.com/user-attachments/assets/d3c76048-c40c-4181-a116-eca6868ebe84",
-    "confidence": "medium"
+    "name": "swiss-editorial-dashboard",
+    "source": "in-repo redesign",
+    "confidence": "high"
   },
   "colorPalette": {
     "primary": {
-      "hex": "#7C4DFF",
-      "tailwind": "violet-500"
+      "hex": "#D9381E",
+      "tailwind": "red-600"
     },
     "background": {
       "base": {
-        "hex": "#0B1020",
-        "tailwind": "slate-950"
+        "hex": "#F4F1EA",
+        "tailwind": "stone-100"
       },
       "surface": {
-        "hex": "#171C2E",
-        "tailwind": "slate-900"
+        "hex": "#F8F5EE",
+        "tailwind": "stone-50"
       },
       "elevated": {
-        "hex": "#232A42",
-        "tailwind": "slate-800"
+        "hex": "#FFFFFF",
+        "tailwind": "white"
       }
     },
     "accent": {
       "info": {
-        "hex": "#5B8CFF",
-        "tailwind": "blue-500"
+        "hex": "#1F4D7A",
+        "tailwind": "blue-800"
       },
       "success": {
-        "hex": "#32D583",
-        "tailwind": "emerald-400"
+        "hex": "#1A7F5A",
+        "tailwind": "emerald-700"
       },
       "warning": {
-        "hex": "#F5B84A",
-        "tailwind": "amber-400"
+        "hex": "#BC6A00",
+        "tailwind": "amber-700"
       }
     },
     "text": {
-      "heading": "#F8FAFC",
-      "body": "rgba(248,250,252,0.78)",
-      "muted": "rgba(248,250,252,0.58)"
+      "heading": "#111111",
+      "body": "rgba(17,17,17,0.80)",
+      "muted": "rgba(17,17,17,0.55)"
     }
   },
   "spacingScale": {
@@ -49,24 +49,24 @@
     "stepsPx": [4, 8, 12, 16, 20, 24]
   },
   "borderRadius": {
-    "style": "standard",
-    "card": "16px",
-    "control": "12px",
-    "chip": "10px",
+    "style": "minimal",
+    "card": "0px",
+    "control": "2px",
+    "chip": "2px",
     "pill": "9999px"
   },
   "effects": {
-    "cardShadow": "0 18px 42px -24px rgba(2, 6, 23, 0.85)",
-    "panelShadow": "0 0 0 1px rgba(148, 163, 184, 0.12), 0 14px 36px -24px rgba(2, 6, 23, 0.8)",
-    "backdropBlur": "blur(14px)",
-    "surfaceBorder": "rgba(148, 163, 184, 0.16)",
-    "subtleBorder": "rgba(148, 163, 184, 0.10)",
-    "elevatedSoft": "rgba(35, 42, 66, 0.60)",
-    "elevatedSoftAlt": "rgba(35, 42, 66, 0.30)",
-    "focusRing": "rgba(124, 77, 255, 0.50)",
-    "accentGlow": "rgba(124, 77, 255, 0.30)",
-    "surfaceOpacity": 0.88,
-    "panelOpacity": 0.92,
-    "tableHeaderOpacity": 0.75
+    "cardShadow": "0 1px 0 rgba(17,17,17,0.10)",
+    "panelShadow": "0 1px 0 rgba(17,17,17,0.10)",
+    "backdropBlur": "blur(0px)",
+    "surfaceBorder": "rgba(17, 17, 17, 0.20)",
+    "subtleBorder": "rgba(17, 17, 17, 0.10)",
+    "elevatedSoft": "rgba(17, 17, 17, 0.03)",
+    "elevatedSoftAlt": "rgba(17, 17, 17, 0.05)",
+    "focusRing": "rgba(217, 56, 30, 0.45)",
+    "accentGlow": "rgba(217, 56, 30, 0.20)",
+    "surfaceOpacity": 1,
+    "panelOpacity": 1,
+    "tableHeaderOpacity": 1
   }
 }

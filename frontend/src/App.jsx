@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Chart as ChartJS,
@@ -7,861 +6,334 @@ import {
   LinearScale,
   PointElement,
   LineElement,
-  BarElement,
-  ArcElement,
   Filler,
   Tooltip,
   Legend,
 } from 'chart.js'
-import { Line, Bar, Doughnut } from 'react-chartjs-2'
-import {
-  BarChart3,
-  Bot,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  Send,
-  Sparkles,
-  TrendingUp,
-  Zap,
-  CheckCircle2,
-  AlertTriangle,
-  X,
-} from 'lucide-react'
+import { Line } from 'react-chartjs-2'
+import { AlertTriangle, ArrowUpRight, Gauge, Layers, Users2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Filler, Tooltip, Legend)
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip, Legend)
 
 const API_BASE = '/api'
 
-// Utility for combining classes
-import { cn } from '@/lib/utils'
+const revealItem = {
+  hidden: { opacity: 0, y: 14 },
+  visible: i => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1], delay: i * 0.05 },
+  }),
+}
 
 function App() {
-  const [tasks, setTasks] = useState([])
   const [summary, setSummary] = useState({})
-  const [scurveData, setScurveData] = useState({ labels: [], baseline: [], actual: [] })
-  const [resources, setResources] = useState([])
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hello! I can help update tasks. Try "Add 20 hours to Build 2" or "Set task 108 to 50% complete".' }
-  ])
-  const [chatInput, setChatInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [dataLoading, setDataLoading] = useState(true)
-  const [toast, setToast] = useState(null)
-  const [pendingAction, setPendingAction] = useState(null)
-  const [selectedProject, setSelectedProject] = useState(null)
-  const [projectScurve, setProjectScurve] = useState(null)
-  const [showCharts, setShowCharts] = useState(true)
+  const [tasks, setTasks] = useState([])
+  const [scurveData, setScurveData] = useState({ labels: [], baseline: [], actual: [], scheduled: [], earned: [] })
   const [resourceAllocation, setResourceAllocation] = useState([])
   const [mismatchWarnings, setMismatchWarnings] = useState([])
-  const [crStages, setCrStages] = useState({})
-  const chatRef = useRef(null)
-  const tableContainerRef = useRef(null)
-
-  // Fetch all data
-  const fetchData = async () => {
-    try {
-      const [tasksRes, summaryRes, scurveRes, resourcesRes, allocRes, mismatchRes, stagesRes] = await Promise.all([
-        fetch(`${API_BASE}/tasks`),
-        fetch(`${API_BASE}/summary`),
-        fetch(`${API_BASE}/scurve`),
-        fetch(`${API_BASE}/resources`),
-        fetch(`${API_BASE}/resource-allocation`),
-        fetch(`${API_BASE}/mismatch-warnings`),
-        fetch(`${API_BASE}/cr-stages`)
-      ])
-      setTasks(await tasksRes.json())
-      setSummary(await summaryRes.json())
-      setScurveData(await scurveRes.json())
-      setResources(await resourcesRes.json())
-      setResourceAllocation(await allocRes.json())
-      setMismatchWarnings(await mismatchRes.json())
-      setCrStages(await stagesRes.json())
-    } catch (err) {
-      showToast('Failed to load data', 'error')
-    } finally {
-      setDataLoading(false)
-    }
-  }
+  const [dataLoading, setDataLoading] = useState(true)
+  const [bootProgress, setBootProgress] = useState(0)
+  const [showBootLoader, setShowBootLoader] = useState(true)
 
   useEffect(() => {
+    let rafId
+    let start
+    const duration = 850
+
+    const tick = timestamp => {
+      if (!start) start = timestamp
+      const elapsed = timestamp - start
+      const progress = Math.min(100, Math.round((elapsed / duration) * 100))
+      setBootProgress(progress)
+
+      if (progress < 100) {
+        rafId = requestAnimationFrame(tick)
+      } else {
+        setTimeout(() => setShowBootLoader(false), 140)
+      }
+    }
+
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
+  }, [])
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [summaryRes, tasksRes, scurveRes, allocRes, mismatchRes] = await Promise.all([
+          fetch(`${API_BASE}/summary`),
+          fetch(`${API_BASE}/tasks`),
+          fetch(`${API_BASE}/scurve`),
+          fetch(`${API_BASE}/resource-allocation`),
+          fetch(`${API_BASE}/mismatch-warnings`),
+        ])
+
+        setSummary(await summaryRes.json())
+        setTasks(await tasksRes.json())
+        setScurveData(await scurveRes.json())
+        setResourceAllocation(await allocRes.json())
+        setMismatchWarnings(await mismatchRes.json())
+      } catch (error) {
+        console.error('Failed to load dashboard data', error)
+      } finally {
+        setDataLoading(false)
+      }
+    }
+
     fetchData()
   }, [])
 
-  // Fetch project-specific S-curve when selected
-  useEffect(() => {
-    const fetchProjectScurve = async () => {
-      if (selectedProject) {
-        try {
-          const res = await fetch(`${API_BASE}/scurve/${encodeURIComponent(selectedProject)}`)
-          if (res.ok) {
-            setProjectScurve(await res.json())
-          }
-        } catch (err) {
-          console.error('Failed to fetch project S-curve')
-        }
-      } else {
-        setProjectScurve(null)
-      }
-    }
-    fetchProjectScurve()
-  }, [selectedProject])
+  const kpiItems = useMemo(() => {
+    const variance = summary.total_variance || 0
+    const activeProjects = tasks.filter(t => !t.parent_task).length
+    const totalCapacity = resourceAllocation.reduce((sum, r) => sum + (r.capacity || 0), 0)
+    const totalCompleted = resourceAllocation.reduce((sum, r) => sum + (r.completed || 0), 0)
+    const utilization = totalCapacity > 0 ? Math.round((totalCompleted / totalCapacity) * 100) : 0
+    const velocity = summary.total_completed
+      ? Number(((summary.total_earned_value || 0) / summary.total_completed).toFixed(2))
+      : 0
 
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
-  }
+    return [
+      {
+        label: 'Project Metrics',
+        value: `${summary.total_tasks || 0}`,
+        sub: `${Math.round(summary.total_completed || 0).toLocaleString()}h complete`,
+        icon: Layers,
+      },
+      {
+        label: 'Overall Velocity',
+        value: `${velocity}x`,
+        sub: `${Math.round(summary.total_earned_value || 0).toLocaleString()}h earned value`,
+        icon: Gauge,
+      },
+      {
+        label: 'Resource Allocation',
+        value: `${utilization}%`,
+        sub: `${resourceAllocation.length || 0} resources loaded`,
+        icon: Users2,
+      },
+      {
+        label: 'Active Projects',
+        value: `${activeProjects}`,
+        sub: `${variance > 0 ? '+' : ''}${Math.round(variance)}h variance`,
+        icon: ArrowUpRight,
+        accent: variance > 0 ? 'warning' : 'neutral',
+      },
+    ]
+  }, [resourceAllocation, summary, tasks])
 
-  const updateTask = async (taskId, field, value) => {
-    try {
-      const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: value })
-      })
-      if (res.ok) {
-        showToast('Saved!')
-        fetchData()
-      }
-    } catch (err) {
-      showToast('Save failed', 'error')
-    }
-  }
-
-  // Build conversation history for context
-  const buildHistory = () => {
-    // Filter out system messages and convert to API format
-    return messages
-      .filter(m => m.role === 'user' || m.role === 'assistant')
-      .map(m => ({
-        role: m.role,
-        content: m.content
-      }))
-  }
-
-  // Handle chat send
-  const sendChat = async () => {
-    if (!chatInput.trim() || loading) return
-    
-    const userMsg = chatInput.trim()
-    const newUserMessage = { role: 'user', content: userMsg }
-    setMessages(m => [...m, newUserMessage])
-    setChatInput('')
-    setLoading(true)
-    setMessages(m => [...m, { role: 'assistant', content: 'Thinking...', loading: true }])
-
-    try {
-      // Send with conversation history
-      const history = buildHistory()
-      
-      const res = await fetch(`${API_BASE}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          query: userMsg,
-          history: history
-        })
-      })
-      
-      setMessages(m => m.filter(msg => !msg.loading))
-      
-      if (res.ok) {
-        const data = await res.json()
-        setMessages(m => [...m, { role: 'assistant', content: data.reply }])
-        
-        if (data.needs_confirmation && data.options) {
-          setPendingAction({
-            id: data.pending_action_id,
-            options: data.options
-          })
-        } else if (data.changes_count > 0) {
-          showToast(`✨ ${data.changes_count} changes applied!`)
-          fetchData()
-        }
-      } else {
-        const err = await res.json()
-        setMessages(m => [...m, { role: 'assistant', content: `❌ ${err.detail || 'Error'}` }])
-      }
-    } catch (err) {
-      setMessages(m => m.filter(msg => !msg.loading))
-      setMessages(m => [...m, { role: 'assistant', content: '❌ Connection failed' }])
-    }
-    setLoading(false)
-  }
-
-  const confirmAction = async (optionNumber) => {
-    if (!pendingAction) return
-    
-    setLoading(true)
-    const chosenOption = pendingAction.options.find(o => o.option === optionNumber)
-    setMessages(m => [...m, { role: 'user', content: `Option ${optionNumber}: ${chosenOption?.label || 'Selected'}` }])
-    
-    try {
-      const res = await fetch(`${API_BASE}/confirm-action`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action_id: pendingAction.id, 
-          chosen_option: optionNumber 
-        })
-      })
-      
-      if (res.ok) {
-        const data = await res.json()
-        setMessages(m => [...m, { role: 'assistant', content: data.message || '✅ Done!' }])
-        if (data.success) {
-          showToast('✨ Changes applied!')
-          fetchData()
-        }
-      } else {
-        const err = await res.json()
-        setMessages(m => [...m, { role: 'assistant', content: `❌ ${err.detail || 'Failed'}` }])
-      }
-    } catch (err) {
-      setMessages(m => [...m, { role: 'assistant', content: '❌ Connection failed' }])
-    }
-    
-    setPendingAction(null)
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    if (chatRef.current) {
-      chatRef.current.scrollTop = chatRef.current.scrollHeight
-    }
-  }, [messages])
-
-  const parentTasks = tasks.filter(t => !t.parent_task && tasks.some(st => st.parent_task === t.task))
-
-  // Chart configurations
-  const chartData = {
+  const chartData = useMemo(() => ({
     labels: scurveData.labels || [],
     datasets: [
       {
-        label: 'Baseline (Planned)',
+        label: 'Baseline',
         data: scurveData.baseline || [],
-        borderColor: 'rgb(156, 163, 175)',
-        borderDash: [5, 5],
-        borderWidth: 2,
+        borderColor: '#161616',
+        borderWidth: 1.4,
+        borderDash: [4, 5],
         pointRadius: 0,
-        fill: false,
-        tension: 0.4
       },
       {
-        label: 'Scheduled (Current)',
+        label: 'Scheduled',
         data: scurveData.scheduled || scurveData.actual || [],
-        borderColor: 'rgb(59, 130, 246)',
-        borderWidth: 2.5,
+        borderColor: '#D9381E',
+        backgroundColor: 'rgba(217, 56, 30, 0.14)',
+        borderWidth: 2,
         pointRadius: 0,
-        backgroundColor: 'rgba(59, 130, 246, 0.08)',
         fill: true,
-        tension: 0.4
       },
       {
         label: 'Earned Value',
         data: scurveData.earned || [],
-        borderColor: 'rgb(34, 197, 94)',
-        borderWidth: 2.5,
+        borderColor: '#4B4B4B',
+        borderWidth: 1.5,
         pointRadius: 0,
-        fill: false,
-        tension: 0.4
-      }
-    ]
-  }
+      },
+    ],
+  }), [scurveData])
 
-  const fullScurveOptions = {
+  const chartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
     plugins: {
       legend: {
         position: 'top',
+        align: 'start',
         labels: {
+          color: '#262626',
+          boxWidth: 8,
+          boxHeight: 8,
           usePointStyle: true,
-          boxWidth: 6,
-          padding: 16,
-          font: { size: 11, weight: '500' },
-          color: 'rgba(255,255,255,0.6)'
-        }
+          pointStyle: 'line',
+          font: { family: 'Space Grotesk, sans-serif', size: 11, weight: '600' },
+        },
       },
       tooltip: {
-        mode: 'index',
-        intersect: false,
-        backgroundColor: 'rgba(17, 17, 17, 0.95)',
-        titleColor: '#ffffff',
-        bodyColor: 'rgba(255,255,255,0.7)',
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        borderWidth: 1,
-        padding: 12,
-        boxPadding: 4,
-        cornerRadius: 8,
-      }
+        backgroundColor: '#101010',
+        titleColor: '#F4F1EA',
+        bodyColor: '#F4F1EA',
+        borderWidth: 0,
+        titleFont: { family: 'Space Grotesk, sans-serif', size: 12, weight: '700' },
+        bodyFont: { family: 'IBM Plex Mono, monospace', size: 11, weight: '500' },
+      },
     },
     scales: {
       x: {
-        grid: { display: false },
-        ticks: { maxTicksLimit: 8, font: { size: 10 }, color: 'rgba(255,255,255,0.4)' }
+        grid: { color: 'rgba(18, 18, 18, 0.08)' },
+        ticks: {
+          color: '#474747',
+          maxTicksLimit: 8,
+          font: { family: 'IBM Plex Mono, monospace', size: 10, weight: '500' },
+        },
       },
       y: {
         beginAtZero: true,
-        grid: { color: 'rgba(255,255,255,0.06)' },
-        ticks: { font: { size: 10 }, color: 'rgba(255,255,255,0.4)' }
-      }
+        grid: { color: 'rgba(18, 18, 18, 0.08)' },
+        ticks: {
+          color: '#474747',
+          font: { family: 'IBM Plex Mono, monospace', size: 10, weight: '500' },
+        },
+      },
     },
-    interaction: { mode: 'nearest', axis: 'x', intersect: false }
-  }
+  }), [])
 
-  const maxCapacity = Math.max(...resourceAllocation.map(r => r.capacity), 1)
-  
-  const resourceChartData = {
-    labels: resourceAllocation.map(r => r.name),
-    datasets: [
-      {
-        label: 'Completed',
-        data: resourceAllocation.map(r => (r.completed / maxCapacity) * 100),
-        backgroundColor: 'rgb(34, 197, 94)',
-        borderRadius: 4
-      },
-      {
-        label: 'Remaining',
-        data: resourceAllocation.map(r => (r.remaining / maxCapacity) * 100),
-        backgroundColor: 'rgb(59, 130, 246)',
-        borderRadius: 4
-      },
-      {
-        label: 'Available',
-        data: resourceAllocation.map(r => (r.available / maxCapacity) * 100),
-        backgroundColor: 'rgba(156, 163, 175, 0.2)',
-        borderRadius: 4
-      }
-    ]
-  }
-
-  const resourceChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    indexAxis: 'y',
-    plugins: { 
-      legend: {
-        position: 'top',
-        labels: { usePointStyle: true, boxWidth: 6, padding: 12, font: { size: 11 }, color: 'rgba(255,255,255,0.6)' }
-      },
-      tooltip: {
-        backgroundColor: 'rgba(17, 17, 17, 0.95)',
-        titleColor: '#ffffff',
-        bodyColor: 'rgba(255,255,255,0.7)',
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        borderWidth: 1,
-        padding: 12,
-        cornerRadius: 8,
-        callbacks: {
-          label: (context) => {
-            const r = resourceAllocation[context.dataIndex]
-            if (!r) return ''
-            const label = context.dataset.label
-            if (label === 'Completed') return `Completed: ${r.completed}h`
-            if (label === 'Remaining') return `Remaining: ${r.remaining}h`
-            if (label === 'Available') return `Available: ${r.available}h`
-            return ''
-          }
-        }
-      }
-    },
-    scales: {
-      x: { stacked: true, grid: { display: false }, max: 100, ticks: { callback: v => v + '%', font: { size: 10 }, color: 'rgba(255,255,255,0.4)' } },
-      y: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, color: 'rgba(255,255,255,0.5)' } }
-    }
-  }
-
-  const totalDev = tasks.reduce((sum, t) => sum + (t.dev_hours || 0), 0)
-  const totalTest = tasks.reduce((sum, t) => sum + (t.test_hours || 0), 0)
-  const totalReview = tasks.reduce((sum, t) => sum + (t.review_hours || 0), 0)
-
-  const phaseChartData = {
-    labels: ['Development', 'Testing', 'Review'],
-    datasets: [{
-      data: [totalDev, totalTest, totalReview],
-      backgroundColor: ['rgb(59, 130, 246)', 'rgb(245, 158, 11)', 'rgb(34, 197, 94)'],
-      borderWidth: 0,
-      spacing: 2
-    }]
-  }
-
-  const phaseChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    cutout: '65%',
-    plugins: {
-      legend: {
-        position: 'bottom',
-        labels: { usePointStyle: true, boxWidth: 6, padding: 16, font: { size: 11 }, color: 'rgba(255,255,255,0.6)' }
-      }
-    }
-  }
-
-  const variance = summary.total_variance || 0
-
-  // Virtualizer for the task table
-  const rowVirtualizer = useVirtualizer({
-    count: tasks.length,
-    getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 48,
-    overscan: 8,
-  })
-  const virtualRows = rowVirtualizer.getVirtualItems()
-  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0
-  const paddingBottom = virtualRows.length > 0
-    ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
-    : 0
+  const alerts = mismatchWarnings.slice(0, 8)
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Stats Bar - sticky inside the scrolling layout main */}
-      <div className="theme-glass-surface border-b border-[var(--theme-border-subtle)] sticky top-0 z-10 shrink-0">
-        <div className="px-5 py-3">
-          {dataLoading ? (
-            <div className="flex items-center gap-8">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-white/[0.06] animate-pulse" />
-                  <div className="space-y-1.5">
-                    <div className="w-16 h-4 rounded bg-white/[0.06] animate-pulse" />
-                    <div className="w-12 h-3 rounded bg-white/[0.04] animate-pulse" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center gap-8">
-              <StatCard icon={<CheckCircle2 className="w-5 h-5" />} value={summary.total_tasks || 0} label="Tasks" />
-              <StatCard icon={<Clock className="w-5 h-5" />} value={`${Math.round(summary.total_completed || 0).toLocaleString()}h`} label="Completed" color="green" />
-              <StatCard icon={<TrendingUp className="w-5 h-5" />} value={`${Math.round(summary.total_remaining || 0).toLocaleString()}h`} label="Remaining" color="blue" />
-              <StatCard
-                icon={variance > 0 ? <AlertTriangle className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
-                value={`${variance > 0 ? '+' : ''}${Math.round(variance).toLocaleString()}h`}
-                label="Variance"
-                color={variance > 0 ? 'red' : variance < 0 ? 'green' : 'gray'}
-              />
-              <StatCard icon={<Sparkles className="w-5 h-5" />} value={`${Math.round(summary.total_earned_value || 0).toLocaleString()}h`} label="Earned Value" color="purple" />
-
-              {/* Mini S-Curve */}
-              <div className="flex-1 max-w-xs h-14 ml-auto">
-                <Line
-                  data={chartData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { x: { display: false }, y: { display: false } }
-                  }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 px-5 py-4 flex gap-4 min-h-0">
-        {/* Task Table */}
-        <div className="flex-1 theme-panel overflow-hidden flex flex-col min-w-0">
-          {/* Mismatch Warnings Banner */}
-          {mismatchWarnings.length > 0 && (
-            <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-2.5 shrink-0">
-              <div className="flex items-center gap-2 text-amber-400 text-xs font-semibold">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                {mismatchWarnings.length} Hours vs Progress Mismatch{mismatchWarnings.length > 1 ? 'es' : ''}:
-                <span className="font-normal text-amber-400/70">
-                  {mismatchWarnings.slice(0, 3).map(w => `${w.task}: ${w.gap}pts ${w.direction}`).join(' • ')}
-                  {mismatchWarnings.length > 3 && ' …'}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Virtualized Table */}
-          <div
-            ref={tableContainerRef}
-            className="overflow-auto flex-1"
+    <div className="relative h-full overflow-auto editorial-dashboard">
+      <AnimatePresence>
+        {showBootLoader && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.2, ease: 'easeOut' } }}
+            className="fixed inset-0 z-50 bg-[var(--theme-bg-base)] border-b border-[var(--theme-border-subtle)] flex items-center justify-center"
           >
-            <table className="w-full border-collapse">
-              <thead className="sticky top-0 z-10">
-                <tr className="theme-table-header">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">ID</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Task</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Resource</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Work</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Done</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Left</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Var</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Finish</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Stage</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider w-48">Progress</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.04]">
-                {dataLoading ? (
-                  [...Array(12)].map((_, i) => (
-                    <tr key={i} className="border-b border-white/[0.04]">
-                      {[...Array(10)].map((__, j) => (
-                        <td key={j} className="px-4 py-3">
-                          <div className="h-4 rounded bg-white/[0.06] animate-pulse" style={{ width: j === 1 ? '80%' : j === 2 ? '60%' : '50%' }} />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : (
-                  <>
-                    {paddingTop > 0 && (
-                      <tr><td colSpan={10} style={{ height: `${paddingTop}px`, padding: 0 }} /></tr>
-                    )}
-                    {virtualRows.map(virtualRow => {
-                      const task = tasks[virtualRow.index]
-                      const isParent = tasks.some(t => t.parent_task === task.task)
-                      const isChild = !!task.parent_task
-                      const taskVariance = task.variance || 0
+            <div className="text-center">
+              <div className="font-data text-[11px] tracking-[0.32em] uppercase text-[var(--theme-text-muted)]">KPI Automation</div>
+              <div className="mt-4 font-data text-[58px] leading-none text-[var(--theme-text-heading)] tabular-nums">{bootProgress}%</div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-                      return (
-                        <tr
-                          key={task.id}
-                          className={cn(
-                            'hover:bg-white/[0.04] transition-colors',
-                            isParent && 'bg-white/[0.03] border-l-2 border-l-blue-500/50',
-                          )}
-                        >
-                          <td className={cn('px-4 py-3 text-sm', isParent ? 'text-blue-400 font-semibold' : 'text-white/30')}>
-                            {task.id}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={cn(
-                              'text-sm flex items-center',
-                              isChild && 'pl-6',
-                              isParent && 'font-semibold text-white'
-                            )}>
-                              {isChild && <span className="text-white/20 mr-1.5 text-xs">└─</span>}
-                              {isParent && <span className="mr-1.5 text-blue-400">▸</span>}
-                              <span className={isChild ? 'text-white/70' : ''}>{task.task}</span>
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            {isParent ? (
-                              <span className="text-xs text-white/30 italic">auto</span>
-                            ) : (
-                              <select
-                                 className="text-sm bg-[var(--theme-bg-elevated)] border border-[var(--theme-border-subtle)] rounded-[var(--theme-radius-chip)] text-[var(--theme-text-body)] cursor-pointer hover:text-[var(--theme-accent-primary)] focus:outline-none px-1"
-                                value={task.resource || ''}
-                                onChange={(e) => updateTask(task.id, 'resource', e.target.value)}
-                              >
-                                {resources.map(r => (
-                                  <option key={r.name} value={r.name}>{r.name}</option>
-                                ))}
-                              </select>
-                            )}
-                          </td>
-                          <td className={cn('px-4 py-3 text-sm text-right font-medium', isParent ? 'text-white' : 'text-white/70')}>
-                            {Math.round(task.work_hours)}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right text-green-400 font-medium">
-                            {Math.round(task.hours_completed || 0)}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right text-blue-400">
-                            {Math.round(task.hours_remaining || task.work_hours)}
-                          </td>
-                          <td className={cn(
-                            'px-4 py-3 text-sm text-right font-medium',
-                            taskVariance > 0 && 'text-red-400',
-                            taskVariance < 0 && 'text-green-400',
-                            taskVariance === 0 && 'text-white/30'
-                          )}>
-                            {taskVariance > 0 ? '+' : ''}{Math.round(taskVariance)}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-white/50">
-                            {task.finish_date ? new Date(task.finish_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}
-                          </td>
-                          <td className="px-4 py-3">
-                            {isParent ? (
-                              <span className="text-xs text-white/30 italic">—</span>
-                            ) : (
-                              <select
-                                className={cn(
-                                   'text-xs px-2 py-1 rounded-[var(--theme-radius-chip)] font-semibold border border-[var(--theme-border-subtle)] cursor-pointer focus:outline-none bg-[var(--theme-bg-elevated)]',
-                                  task.cr_stage === 'resolved' ? 'bg-green-500/20 text-green-400' :
-                                  task.cr_stage === 'review' ? 'bg-purple-500/20 text-purple-400' :
-                                  task.cr_stage === 'implemented' ? 'bg-blue-500/20 text-blue-400' :
-                                  task.cr_stage === 'analyzed' ? 'bg-amber-500/20 text-amber-400' :
-                                  'bg-white/10 text-white/50'
-                                )}
-                                value={task.cr_stage || 'submitted'}
-                                onChange={async (e) => {
-                                  await fetch(`${API_BASE}/tasks/${task.id}/stage`, {
-                                    method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ stage: e.target.value })
-                                  })
-                                  fetchData()
-                                }}
-                              >
-                                {Object.keys(crStages).map(s => (
-                                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                                ))}
-                              </select>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              {mismatchWarnings.some(w => w.task_id === task.id) && (
-                                <span className="text-amber-500 text-xs" title={mismatchWarnings.find(w => w.task_id === task.id)?.message}>
-                                  ⚠️
-                                </span>
-                              )}
-                              <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
-                                <div
-                                  className={cn(
-                                    'h-full rounded-full transition-all duration-300',
-                                    task.percent_complete >= 100 ? 'bg-green-500' :
-                                    task.percent_complete >= 75 ? 'bg-blue-500' :
-                                    task.percent_complete >= 50 ? 'bg-blue-400' :
-                                    task.percent_complete >= 25 ? 'bg-amber-400' : 'bg-white/20'
-                                  )}
-                                  style={{ width: `${task.percent_complete}%` }}
-                                />
-                              </div>
-                              {isParent ? (
-                                <span className="text-xs font-semibold text-white/60 w-10 text-right">
-                                  {task.percent_complete}%
-                                </span>
-                              ) : (
-                                <>
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    value={task.percent_complete}
-                                    className="w-16 h-1 accent-blue-500 cursor-pointer opacity-0 hover:opacity-100 absolute"
-                                    onChange={(e) => updateTask(task.id, 'percent_complete', parseInt(e.target.value))}
-                                  />
-                                  <span className="text-xs font-medium text-white/40 w-10 text-right">
-                                    {task.percent_complete}%
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                    {paddingBottom > 0 && (
-                      <tr><td colSpan={10} style={{ height: `${paddingBottom}px`, padding: 0 }} /></tr>
-                    )}
-                  </>
-                )}
-              </tbody>
-            </table>
+      <div className="max-w-[1680px] mx-auto px-6 py-6 space-y-6">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1], delay: showBootLoader ? 0.12 : 0 }}
+          className="border border-[var(--theme-border-surface)] bg-[var(--theme-bg-surface)] px-5 py-4"
+        >
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="font-data text-[11px] tracking-[0.22em] uppercase text-[var(--theme-text-muted)]">
+                Executive Snapshot
+              </p>
+              <h1 className="text-[26px] leading-none font-semibold text-[var(--theme-text-heading)]">KPI Automation Dashboard</h1>
+            </div>
+            <p className="font-data text-xs text-[var(--theme-text-muted)]">Data refresh: live</p>
           </div>
+        </motion.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 border border-[var(--theme-border-surface)] divide-y md:divide-y-0 md:divide-x divide-[var(--theme-border-subtle)] bg-[var(--theme-bg-surface)]">
+          {kpiItems.map((item, index) => (
+            <motion.article
+              key={item.label}
+              variants={revealItem}
+              initial="hidden"
+              animate="visible"
+              custom={index}
+              className={cn(
+                'px-5 py-4 group transition-colors duration-150',
+                item.accent === 'warning'
+                  ? 'hover:bg-[rgba(217,56,30,0.08)]'
+                  : 'hover:bg-[rgba(0,0,0,0.03)]'
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--theme-text-muted)] font-medium">{item.label}</p>
+                <item.icon className="w-4 h-4 text-[var(--theme-accent-primary)]" />
+              </div>
+              <p className="font-data mt-3 text-[30px] leading-none text-[var(--theme-text-heading)] tabular-nums">{item.value}</p>
+              <p className="font-data mt-2 text-[11px] text-[var(--theme-text-muted)]">{item.sub}</p>
+            </motion.article>
+          ))}
         </div>
 
-        {/* Right Panel - Chat & Analytics */}
-        <div className="w-96 flex flex-col gap-4 shrink-0" style={{ height: '100%' }}>
-            {/* AI Chat Panel - Always visible at top */}
-            <div className="theme-panel overflow-hidden flex flex-col" style={{ minHeight: '350px', flex: showCharts ? '1 1 350px' : '1 1 auto' }}>
-              <div className="px-5 py-3 border-b border-[var(--theme-border-subtle)] flex items-center gap-2 shrink-0">
-                <div className="p-1.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
-                  <Bot className="w-4 h-4 text-white" />
-                </div>
-                <span className="font-semibold text-[var(--theme-text-heading)]">AI Copilot</span>
-                <span className="ml-auto text-xs text-[var(--theme-text-muted)]">{messages.length - 1} messages</span>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={chatRef}>
-                {messages.map((msg, i) => (
-                  <div 
-                    key={i} 
-                    className={cn(
-                      "flex",
-                      msg.role === 'user' ? "justify-end" : "justify-start"
-                    )}
-                  >
-                    <div className={cn(
-                      "max-w-[85%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed",
-                      msg.role === 'user' 
-                        ? "bg-blue-500 text-white rounded-br-md" 
-                        : "bg-[var(--theme-elevated-soft)] text-[var(--theme-text-body)] rounded-bl-md",
-                      msg.loading && "animate-pulse"
-                    )}>
-                      {msg.content}
-                    </div>
-                  </div>
-                ))}
-                
-                {pendingAction && pendingAction.options && (
-                  <div className="space-y-2 pt-2">
-                    {pendingAction.options.map(opt => (
-                      <button
-                        key={opt.option}
-                        className={cn(
-                          "w-full text-left px-4 py-3 rounded-[var(--theme-radius-control)] text-sm transition-all",
-                          opt.label?.toLowerCase().includes('cancel')
-                            ? "bg-white/[0.06] text-white/60 hover:bg-white/10"
-                            : "bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-500/30"
-                        )}
-                        onClick={() => confirmAction(opt.option)}
-                        disabled={loading}
-                      >
-                        <span className="font-semibold">{opt.option}.</span> {opt.label}
-                        {opt.description && <span className="block text-xs text-white/40 mt-0.5">{opt.description}</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              <div className="p-3 border-t border-[var(--theme-border-subtle)] bg-[var(--theme-elevated-soft-alt)] shrink-0">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    className="flex-1 px-4 py-2.5 bg-[var(--theme-elevated-soft)] border border-[var(--theme-border-subtle)] rounded-[var(--theme-radius-control)] text-sm text-[var(--theme-text-body)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)] focus:border-transparent placeholder-[var(--theme-text-muted)]"
-                    placeholder={pendingAction ? "Choose an option..." : "Type instructions..."}
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && sendChat()}
-                    disabled={loading || pendingAction}
-                  />
-                  <button 
-                    className={cn(
-                       "px-4 py-2.5 rounded-[var(--theme-radius-control)] font-medium text-sm transition-all flex items-center gap-2",
-                      loading || pendingAction || !chatInput.trim()
-                        ? "bg-white/[0.06] text-white/30 cursor-not-allowed"
-                         : "bg-[var(--theme-accent-primary)] text-white hover:brightness-110 shadow-[0_0_15px_var(--theme-accent-glow)]"
-                    )}
-                    onClick={sendChat} 
-                    disabled={loading || pendingAction || !chatInput.trim()}
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          <motion.section
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.35 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            className="xl:col-span-8 border border-[var(--theme-border-surface)] bg-[var(--theme-bg-surface)]"
+          >
+            <div className="px-5 py-4 border-b border-[var(--theme-border-subtle)]">
+              <p className="font-data text-[11px] uppercase tracking-[0.16em] text-[var(--theme-text-muted)]">Main Chart Visualization</p>
+              <h2 className="mt-1 text-base font-semibold text-[var(--theme-text-heading)]">Cumulative Delivery Curve</h2>
             </div>
-
-            {/* Analytics Panel - Collapsible below chat */}
-            <div className="theme-panel overflow-hidden" style={{ flex: showCharts ? '1 1 auto' : '0 0 auto' }}>
-              <button 
-                className="w-full px-5 py-3 flex items-center justify-between hover:bg-white/[0.04] transition-colors"
-                onClick={() => setShowCharts(!showCharts)}
-              >
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-blue-400" />
-                  <span className="font-semibold text-[var(--theme-text-heading)]">Analytics</span>
-                </div>
-                {showCharts ? <ChevronUp className="w-4 h-4 text-white/30" /> : <ChevronDown className="w-4 h-4 text-white/30" />}
-              </button>
-              
-              {showCharts && (
-                <div className="px-5 pb-5 space-y-5 overflow-y-auto" style={{ maxHeight: '500px' }}>
-                  {/* S-Curve Card */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-white/60">S-Curve</span>
-                      <select 
-                        className="text-xs border border-[var(--theme-border-subtle)] bg-[var(--theme-bg-elevated)] rounded-[var(--theme-radius-chip)] px-2 py-1 text-[var(--theme-text-body)] cursor-pointer focus:ring-2 focus:ring-[rgba(124,77,255,0.5)]"
-                        value={selectedProject || ''}
-                        onChange={(e) => setSelectedProject(e.target.value || null)}
-                      >
-                        <option value="">All Projects</option>
-                        {parentTasks.map(t => (
-                          <option key={t.id} value={t.task}>{t.task}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="h-44 -mx-2">
-                      <Line 
-                        data={projectScurve ? {
-                          labels: projectScurve.labels,
-                          datasets: chartData.datasets.map((ds, i) => ({
-                            ...ds,
-                            data: i === 0 ? projectScurve.baseline : i === 1 ? (projectScurve.scheduled || projectScurve.actual) : projectScurve.earned
-                          }))
-                        } : chartData} 
-                        options={fullScurveOptions} 
-                      />
-                    </div>
-                  </div>
-
-                  {/* Resource Workload */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-white/60">Resource Workload</span>
-                      {resourceAllocation.some(r => r.overallocated) && (
-                        <span className="text-xs text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full font-medium">⚠️ Overallocation</span>
-                      )}
-                    </div>
-                    <div className="h-36 -mx-2">
-                      <Bar data={resourceChartData} options={resourceChartOptions} />
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {resourceAllocation.map(r => (
-                        <span 
-                          key={r.name}
-                          className={cn(
-                            "text-xs px-2 py-1 rounded-full font-medium",
-                            r.overallocated ? "bg-red-500/20 text-red-400" : "bg-white/[0.06] text-white/50"
-                          )}
-                        >
-                          {r.name} {r.utilization}%
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Phase Breakdown */}
-                  <div className="space-y-3">
-                    <span className="text-sm font-medium text-white/60">Phase Breakdown</span>
-                    <div className="h-32">
-                      {(totalDev + totalTest + totalReview) > 0 ? (
-                        <Doughnut data={phaseChartData} options={phaseChartOptions} />
-                      ) : (
-                        <div className="h-full flex items-center justify-center text-white/30 text-sm">No phase data</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+            <div className="h-[420px] px-4 py-4">
+              {dataLoading ? (
+                <div className="h-full border border-dashed border-[var(--theme-border-subtle)] animate-pulse" />
+              ) : (
+                <Line data={chartData} options={chartOptions} />
               )}
             </div>
+          </motion.section>
 
+          <motion.aside
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
+            className="xl:col-span-4 border border-[var(--theme-border-surface)] bg-[var(--theme-bg-surface)]"
+          >
+            <div className="px-5 py-4 border-b border-[var(--theme-border-subtle)]">
+              <p className="font-data text-[11px] uppercase tracking-[0.16em] text-[var(--theme-text-muted)]">Recent Alerts</p>
+              <h2 className="mt-1 text-base font-semibold text-[var(--theme-text-heading)]">Hours vs Progress Anomalies</h2>
+            </div>
 
-          </div>
+            <div className="max-h-[420px] overflow-auto divide-y divide-[var(--theme-border-subtle)]">
+              {dataLoading && (
+                <div className="space-y-3 p-4">
+                  {[...Array(5)].map((_, idx) => (
+                    <div key={idx} className="h-14 border border-dashed border-[var(--theme-border-subtle)] animate-pulse" />
+                  ))}
+                </div>
+              )}
+
+              {!dataLoading && alerts.length === 0 && (
+                <div className="p-5">
+                  <p className="font-data text-[12px] text-[var(--theme-text-muted)]">No active alerts at this time.</p>
+                </div>
+              )}
+
+              {!dataLoading && alerts.map((alert, idx) => (
+                <motion.div
+                  key={alert.task_id}
+                  variants={revealItem}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true, amount: 0.6 }}
+                  custom={idx}
+                  className="p-4 hover:bg-[rgba(0,0,0,0.03)] transition-colors duration-150"
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-4 h-4 text-[var(--theme-accent-primary)] mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[var(--theme-text-heading)] truncate">{alert.task}</p>
+                      <p className="mt-1 font-data text-[11px] text-[var(--theme-text-muted)]">
+                        gap {alert.gap} pts · {alert.direction} · {alert.resource}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.aside>
         </div>
-
-      {/* Toast */}
-      {toast && (
-        <div className={cn(
-          "fixed bottom-6 right-6 px-5 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 animate-in slide-in-from-bottom-4 duration-300",
-          toast.type === 'error' ? "bg-red-500 text-white" : "bg-green-500 text-white"
-        )}>
-          {toast.type === 'error' ? <X className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-          {toast.message}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Stat Card Component
-function StatCard({ icon, value, label, color = 'blue' }) {
-  const colorClasses = {
-    blue: 'text-[var(--theme-accent-info)] bg-blue-500/15',
-    green: 'text-green-400 bg-green-500/15',
-    red: 'text-red-400 bg-red-500/15',
-    purple: 'text-purple-400 bg-purple-500/15',
-    gray: 'text-[var(--theme-text-muted)] bg-[var(--theme-elevated-soft)]',
-  }
-  
-  return (
-    <div className="flex items-center gap-3">
-      <div className={cn("p-2 rounded-lg", colorClasses[color])}>
-        {icon}
-      </div>
-      <div>
-        <div className="text-xl font-bold text-[var(--theme-text-heading)]">{value}</div>
-        <div className="text-xs text-[var(--theme-text-muted)] font-medium uppercase tracking-wide">{label}</div>
       </div>
     </div>
   )
