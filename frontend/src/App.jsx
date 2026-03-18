@@ -416,8 +416,8 @@ function App() {
   return (
     <div className="flex flex-col h-full">
       {/* Stats Bar - sticky inside the scrolling layout main */}
-      <div className="bg-[#11111198] backdrop-blur-sm border-b border-white/[0.06] sticky top-0 z-10 shrink-0">
-        <div className="px-6 py-3">
+      <div className="theme-glass-surface border-b border-[var(--theme-border-subtle)] sticky top-0 z-10 shrink-0">
+        <div className="px-5 py-3">
           {dataLoading ? (
             <div className="flex items-center gap-8">
               {[...Array(5)].map((_, i) => (
@@ -461,9 +461,9 @@ function App() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 px-6 py-5 flex gap-5 min-h-0">
+      <div className="flex-1 px-5 py-4 flex gap-4 min-h-0">
         {/* Task Table */}
-        <div className="flex-1 bg-[#11111198] backdrop-blur-sm rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08] overflow-hidden flex flex-col min-w-0">
+        <div className="flex-1 theme-panel overflow-hidden flex flex-col min-w-0">
           {/* Mismatch Warnings Banner */}
           {mismatchWarnings.length > 0 && (
             <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-2.5 shrink-0">
@@ -485,17 +485,17 @@ function App() {
           >
             <table className="w-full border-collapse">
               <thead className="sticky top-0 z-10">
-                <tr className="bg-[#0f0f0f] border-b border-white/[0.06]">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">ID</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Task</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Resource</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Work</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Done</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Left</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-white/40 uppercase tracking-wider">Var</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Finish</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider">Stage</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white/40 uppercase tracking-wider w-48">Progress</th>
+                <tr className="theme-table-header">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">ID</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Task</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Resource</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Work</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Done</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Left</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Var</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Finish</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">Stage</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider w-48">Progress</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.04]">
@@ -547,7 +547,7 @@ function App() {
                               <span className="text-xs text-white/30 italic">auto</span>
                             ) : (
                               <select
-                                className="text-sm bg-[#111111] border border-white/10 rounded text-white/60 cursor-pointer hover:text-blue-400 focus:outline-none px-1"
+                                 className="text-sm bg-[var(--theme-bg-elevated)] border border-[var(--theme-border-subtle)] rounded-[var(--theme-radius-chip)] text-[var(--theme-text-body)] cursor-pointer hover:text-[var(--theme-accent-primary)] focus:outline-none px-1"
                                 value={task.resource || ''}
                                 onChange={(e) => updateTask(task.id, 'resource', e.target.value)}
                               >
@@ -583,7 +583,7 @@ function App() {
                             ) : (
                               <select
                                 className={cn(
-                                  'text-xs px-2 py-1 rounded-lg font-semibold border border-white/10 cursor-pointer focus:outline-none bg-[#111111]',
+                                   'text-xs px-2 py-1 rounded-[var(--theme-radius-chip)] font-semibold border border-[var(--theme-border-subtle)] cursor-pointer focus:outline-none bg-[var(--theme-bg-elevated)]',
                                   task.cr_stage === 'resolved' ? 'bg-green-500/20 text-green-400' :
                                   task.cr_stage === 'review' ? 'bg-purple-500/20 text-purple-400' :
                                   task.cr_stage === 'implemented' ? 'bg-blue-500/20 text-blue-400' :
@@ -662,13 +662,13 @@ function App() {
         {/* Right Panel - Chat & Analytics */}
         <div className="w-96 flex flex-col gap-4 shrink-0" style={{ height: '100%' }}>
             {/* AI Chat Panel - Always visible at top */}
-            <div className="bg-[#11111198] backdrop-blur-sm rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08] overflow-hidden flex flex-col" style={{ minHeight: '350px', flex: showCharts ? '1 1 350px' : '1 1 auto' }}>
-              <div className="px-5 py-3 border-b border-white/[0.06] flex items-center gap-2 shrink-0">
+            <div className="theme-panel overflow-hidden flex flex-col" style={{ minHeight: '350px', flex: showCharts ? '1 1 350px' : '1 1 auto' }}>
+              <div className="px-5 py-3 border-b border-[var(--theme-border-subtle)] flex items-center gap-2 shrink-0">
                 <div className="p-1.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
                   <Bot className="w-4 h-4 text-white" />
                 </div>
-                <span className="font-semibold text-white">AI Copilot</span>
-                <span className="ml-auto text-xs text-white/30">{messages.length - 1} messages</span>
+                <span className="font-semibold text-[var(--theme-text-heading)]">AI Copilot</span>
+                <span className="ml-auto text-xs text-[var(--theme-text-muted)]">{messages.length - 1} messages</span>
               </div>
               
               <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={chatRef}>
@@ -684,7 +684,7 @@ function App() {
                       "max-w-[85%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed",
                       msg.role === 'user' 
                         ? "bg-blue-500 text-white rounded-br-md" 
-                        : "bg-white/[0.06] text-white/80 rounded-bl-md",
+                        : "bg-[rgba(35,42,66,0.6)] text-[var(--theme-text-body)] rounded-bl-md",
                       msg.loading && "animate-pulse"
                     )}>
                       {msg.content}
@@ -698,7 +698,7 @@ function App() {
                       <button
                         key={opt.option}
                         className={cn(
-                          "w-full text-left px-4 py-3 rounded-xl text-sm transition-all",
+                          "w-full text-left px-4 py-3 rounded-[var(--theme-radius-control)] text-sm transition-all",
                           opt.label?.toLowerCase().includes('cancel')
                             ? "bg-white/[0.06] text-white/60 hover:bg-white/10"
                             : "bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-500/30"
@@ -714,11 +714,11 @@ function App() {
                 )}
               </div>
               
-              <div className="p-3 border-t border-white/[0.06] bg-white/[0.02] shrink-0">
+              <div className="p-3 border-t border-[var(--theme-border-subtle)] bg-[rgba(35,42,66,0.3)] shrink-0">
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    className="flex-1 px-4 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent placeholder-white/30"
+                    className="flex-1 px-4 py-2.5 bg-[rgba(35,42,66,0.6)] border border-[var(--theme-border-subtle)] rounded-[var(--theme-radius-control)] text-sm text-[var(--theme-text-body)] focus:outline-none focus:ring-2 focus:ring-[rgba(124,77,255,0.5)] focus:border-transparent placeholder-[var(--theme-text-muted)]"
                     placeholder={pendingAction ? "Choose an option..." : "Type instructions..."}
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
@@ -727,10 +727,10 @@ function App() {
                   />
                   <button 
                     className={cn(
-                      "px-4 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center gap-2",
+                       "px-4 py-2.5 rounded-[var(--theme-radius-control)] font-medium text-sm transition-all flex items-center gap-2",
                       loading || pendingAction || !chatInput.trim()
                         ? "bg-white/[0.06] text-white/30 cursor-not-allowed"
-                        : "bg-blue-500 text-white hover:bg-blue-600 shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+                         : "bg-[var(--theme-accent-primary)] text-white hover:brightness-110 shadow-[0_0_15px_rgba(124,77,255,0.3)]"
                     )}
                     onClick={sendChat} 
                     disabled={loading || pendingAction || !chatInput.trim()}
@@ -742,14 +742,14 @@ function App() {
             </div>
 
             {/* Analytics Panel - Collapsible below chat */}
-            <div className="bg-[#11111198] backdrop-blur-sm rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.3)] border border-white/[0.08] overflow-hidden" style={{ flex: showCharts ? '1 1 auto' : '0 0 auto' }}>
+            <div className="theme-panel overflow-hidden" style={{ flex: showCharts ? '1 1 auto' : '0 0 auto' }}>
               <button 
                 className="w-full px-5 py-3 flex items-center justify-between hover:bg-white/[0.04] transition-colors"
                 onClick={() => setShowCharts(!showCharts)}
               >
                 <div className="flex items-center gap-2">
                   <BarChart3 className="w-5 h-5 text-blue-400" />
-                  <span className="font-semibold text-white">Analytics</span>
+                  <span className="font-semibold text-[var(--theme-text-heading)]">Analytics</span>
                 </div>
                 {showCharts ? <ChevronUp className="w-4 h-4 text-white/30" /> : <ChevronDown className="w-4 h-4 text-white/30" />}
               </button>
@@ -761,7 +761,7 @@ function App() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-white/60">S-Curve</span>
                       <select 
-                        className="text-xs border border-white/10 bg-[#111111] rounded-lg px-2 py-1 text-white/60 cursor-pointer focus:ring-2 focus:ring-blue-500/50"
+                        className="text-xs border border-[var(--theme-border-subtle)] bg-[var(--theme-bg-elevated)] rounded-[var(--theme-radius-chip)] px-2 py-1 text-[var(--theme-text-body)] cursor-pointer focus:ring-2 focus:ring-[rgba(124,77,255,0.5)]"
                         value={selectedProject || ''}
                         onChange={(e) => setSelectedProject(e.target.value || null)}
                       >
@@ -847,11 +847,11 @@ function App() {
 // Stat Card Component
 function StatCard({ icon, value, label, color = 'blue' }) {
   const colorClasses = {
-    blue: 'text-blue-400 bg-blue-500/15',
+    blue: 'text-blue-300 bg-blue-500/15',
     green: 'text-green-400 bg-green-500/15',
     red: 'text-red-400 bg-red-500/15',
     purple: 'text-purple-400 bg-purple-500/15',
-    gray: 'text-white/40 bg-white/[0.06]',
+    gray: 'text-[var(--theme-text-muted)] bg-[rgba(35,42,66,0.6)]',
   }
   
   return (
@@ -860,8 +860,8 @@ function StatCard({ icon, value, label, color = 'blue' }) {
         {icon}
       </div>
       <div>
-        <div className="text-xl font-bold text-white">{value}</div>
-        <div className="text-xs text-white/40 font-medium uppercase tracking-wide">{label}</div>
+        <div className="text-xl font-bold text-[var(--theme-text-heading)]">{value}</div>
+        <div className="text-xs text-[var(--theme-text-muted)] font-medium uppercase tracking-wide">{label}</div>
       </div>
     </div>
   )

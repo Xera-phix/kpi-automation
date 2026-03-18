@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -12,6 +12,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import designTokens from '@/design-tokens.json'
 
 const NAV_ITEMS = [
   { path: '/', label: 'Dashboard', icon: BarChart3, exact: true },
@@ -26,23 +27,45 @@ export default function Layout({ children }) {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
 
+  useEffect(() => {
+    const root = document.documentElement
+    root.style.setProperty('--theme-bg-base', designTokens.colorPalette.background.base.hex)
+    root.style.setProperty('--theme-bg-surface', designTokens.colorPalette.background.surface.hex)
+    root.style.setProperty('--theme-bg-elevated', designTokens.colorPalette.background.elevated.hex)
+    root.style.setProperty('--theme-accent-primary', designTokens.colorPalette.primary.hex)
+    root.style.setProperty('--theme-text-heading', designTokens.colorPalette.text.heading)
+    root.style.setProperty('--theme-text-body', designTokens.colorPalette.text.body)
+    root.style.setProperty('--theme-text-muted', designTokens.colorPalette.text.muted)
+    root.style.setProperty('--theme-radius-card', designTokens.borderRadius.card)
+    root.style.setProperty('--theme-radius-control', designTokens.borderRadius.control)
+    root.style.setProperty('--theme-radius-chip', designTokens.borderRadius.chip)
+    root.style.setProperty('--theme-shadow-card', designTokens.effects.cardShadow)
+    root.style.setProperty('--theme-shadow-panel', designTokens.effects.panelShadow)
+    root.style.setProperty('--theme-backdrop-blur', designTokens.effects.backdropBlur)
+    root.style.setProperty('--theme-border-surface', designTokens.effects.surfaceBorder)
+    root.style.setProperty('--theme-border-subtle', designTokens.effects.subtleBorder)
+  }, [])
+
   const currentPage = NAV_ITEMS.find(item =>
     item.exact ? location.pathname === item.path : location.pathname === item.path
   )
 
   return (
-    <div className="flex h-screen bg-[#0a0a0a] overflow-hidden">
+    <div className="flex h-screen theme-bg-base overflow-hidden">
       {/* Sidebar */}
       <motion.aside
         initial={false}
         animate={{ width: collapsed ? 56 : 220 }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        className="flex flex-col bg-[#111111cc] backdrop-blur-xl border-r border-white/[0.06] shrink-0 z-20 overflow-hidden"
+        className="flex flex-col theme-glass-surface border-r shrink-0 z-20 overflow-hidden"
       >
         {/* Logo */}
-        <div className="h-14 flex items-center px-3 border-b border-white/[0.06] gap-2.5 shrink-0">
-          <div className="p-1.5 bg-blue-500/20 rounded-lg shrink-0">
-            <BarChart3 className="w-5 h-5 text-blue-400" />
+          <div className="h-14 flex items-center px-3 border-b border-[var(--theme-border-subtle)] gap-2.5 shrink-0">
+            <div
+              className="p-1.5 rounded-[var(--theme-radius-chip)] shrink-0"
+              style={{ backgroundColor: 'rgba(124, 77, 255, 0.2)' }}
+            >
+              <BarChart3 className="w-5 h-5 text-[var(--theme-accent-primary)]" />
           </div>
           <AnimatePresence initial={false}>
             {!collapsed && (
@@ -54,8 +77,8 @@ export default function Layout({ children }) {
                 transition={{ duration: 0.15 }}
                 className="overflow-hidden"
               >
-                <div className="text-sm font-semibold text-white whitespace-nowrap">KPI Tracker</div>
-                <div className="text-[10px] text-white/30 whitespace-nowrap">Schedule-IKP</div>
+                  <div className="text-sm font-semibold text-[var(--theme-text-heading)] whitespace-nowrap">KPI Tracker</div>
+                  <div className="text-[10px] text-[var(--theme-text-muted)] whitespace-nowrap">Schedule-IKP</div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -73,10 +96,10 @@ export default function Layout({ children }) {
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  'flex items-center gap-3 px-2.5 py-2 rounded-lg transition-colors text-sm',
+                  'flex items-center gap-3 px-2.5 py-2 rounded-[var(--theme-radius-control)] transition-colors text-sm',
                   isActive
-                    ? 'bg-blue-500/15 text-blue-400'
-                    : 'text-white/50 hover:text-white hover:bg-white/[0.06]'
+                    ? 'bg-[rgba(124,77,255,0.22)] text-[var(--theme-accent-primary)]'
+                    : 'text-[var(--theme-text-body)] hover:text-[var(--theme-text-heading)] hover:bg-[rgba(35,42,66,0.65)]'
                 )}
                 title={collapsed ? item.label : undefined}
               >
@@ -96,7 +119,7 @@ export default function Layout({ children }) {
                   )}
                 </AnimatePresence>
                 {!collapsed && item.badge && (
-                  <span className="px-1.5 py-0.5 bg-amber-400/20 text-amber-300 rounded text-[10px] font-bold shrink-0">
+                  <span className="px-1.5 py-0.5 bg-amber-400/20 text-amber-300 rounded-[var(--theme-radius-chip)] text-[10px] font-bold shrink-0">
                     {item.badge}
                   </span>
                 )}
@@ -106,10 +129,10 @@ export default function Layout({ children }) {
         </nav>
 
         {/* Collapse toggle */}
-        <div className="p-2 border-t border-white/[0.06] shrink-0">
+        <div className="p-2 border-t border-[var(--theme-border-subtle)] shrink-0">
           <button
             onClick={() => setCollapsed(c => !c)}
-            className="w-full flex items-center justify-center p-2 rounded-lg text-white/30 hover:text-white hover:bg-white/[0.06] transition-colors"
+            className="w-full flex items-center justify-center p-2 rounded-[var(--theme-radius-control)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text-heading)] hover:bg-[rgba(35,42,66,0.65)] transition-colors"
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -120,19 +143,19 @@ export default function Layout({ children }) {
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Topbar */}
-        <header className="h-14 bg-[#111111cc] backdrop-blur-xl border-b border-white/[0.06] flex items-center px-6 shrink-0">
+        <header className="h-14 theme-glass-surface border-b border-[var(--theme-border-subtle)] flex items-center px-6 shrink-0">
           {currentPage && (
             <div className="flex items-center gap-2.5">
-              <currentPage.icon className="w-4 h-4 text-white/40" />
-              <span className="font-semibold text-white text-sm">{currentPage.label}</span>
+              <currentPage.icon className="w-4 h-4 text-[var(--theme-text-muted)]" />
+              <span className="font-semibold text-[var(--theme-text-heading)] text-sm">{currentPage.label}</span>
               {currentPage.badge && (
-                <span className="px-1.5 py-0.5 bg-amber-400/20 text-amber-300 rounded text-[10px] font-bold">
+                <span className="px-1.5 py-0.5 bg-amber-400/20 text-amber-300 rounded-[var(--theme-radius-chip)] text-[10px] font-bold">
                   {currentPage.badge}
                 </span>
               )}
             </div>
           )}
-          <span className="ml-auto text-xs text-white/30 bg-white/[0.06] px-2.5 py-1 rounded-full font-medium">
+          <span className="ml-auto text-xs text-[var(--theme-text-muted)] bg-[rgba(35,42,66,0.6)] px-2.5 py-1 rounded-full font-medium">
             v2.2
           </span>
         </header>
