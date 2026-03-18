@@ -6,16 +6,16 @@
   },
   "colorPalette": {
     "primary": {
-      "hex": "#D9381E",
-      "tailwind": "red-600"
+      "hex": "#B85C38",
+      "tailwind": "orange-700"
     },
     "background": {
       "base": {
-        "hex": "#F4F1EA",
+        "hex": "#F5F5F0",
         "tailwind": "stone-100"
       },
       "surface": {
-        "hex": "#F8F5EE",
+        "hex": "#FAF9F6",
         "tailwind": "stone-50"
       },
       "elevated": {
@@ -25,22 +25,22 @@
     },
     "accent": {
       "info": {
-        "hex": "#1F4D7A",
-        "tailwind": "blue-800"
+        "hex": "#3F5F74",
+        "tailwind": "slate-700"
       },
       "success": {
-        "hex": "#1A7F5A",
-        "tailwind": "emerald-700"
+        "hex": "#5F7A64",
+        "tailwind": "green-700"
       },
       "warning": {
-        "hex": "#BC6A00",
-        "tailwind": "amber-700"
+        "hex": "#B85C38",
+        "tailwind": "orange-700"
       }
     },
     "text": {
-      "heading": "#111111",
-      "body": "rgba(17,17,17,0.80)",
-      "muted": "rgba(17,17,17,0.55)"
+      "heading": "#1F1B16",
+      "body": "rgba(31,27,22,0.82)",
+      "muted": "rgba(31,27,22,0.58)"
     }
   },
   "spacingScale": {
@@ -56,15 +56,15 @@
     "pill": "9999px"
   },
   "effects": {
-    "cardShadow": "0 1px 0 rgba(17,17,17,0.10)",
-    "panelShadow": "0 1px 0 rgba(17,17,17,0.10)",
+    "cardShadow": "0 1px 0 rgba(31,27,22,0.08)",
+    "panelShadow": "0 1px 0 rgba(31,27,22,0.08)",
     "backdropBlur": "blur(0px)",
-    "surfaceBorder": "rgba(17, 17, 17, 0.20)",
-    "subtleBorder": "rgba(17, 17, 17, 0.10)",
-    "elevatedSoft": "rgba(17, 17, 17, 0.03)",
-    "elevatedSoftAlt": "rgba(17, 17, 17, 0.05)",
-    "focusRing": "rgba(217, 56, 30, 0.45)",
-    "accentGlow": "rgba(217, 56, 30, 0.20)",
+    "surfaceBorder": "rgba(68, 58, 47, 0.18)",
+    "subtleBorder": "rgba(68, 58, 47, 0.12)",
+    "elevatedSoft": "rgba(31, 27, 22, 0.03)",
+    "elevatedSoftAlt": "rgba(31, 27, 22, 0.05)",
+    "focusRing": "rgba(184, 92, 56, 0.42)",
+    "accentGlow": "rgba(184, 92, 56, 0.18)",
     "surfaceOpacity": 1,
     "panelOpacity": 1,
     "tableHeaderOpacity": 1

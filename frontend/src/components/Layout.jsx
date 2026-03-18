@@ -62,9 +62,9 @@ export default function Layout({ children }) {
       <div className="flex h-screen theme-bg-base overflow-hidden">
       {/* Sidebar */}
       <motion.aside
-        initial={false}
-        animate={{ width: collapsed ? 56 : 220 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        initial={{ opacity: 0, y: 14, width: 220 }}
+        animate={{ opacity: 1, y: 0, width: collapsed ? 56 : 220 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30, delay: 0.1 }}
         className="flex flex-col theme-glass-surface border-r border-[var(--theme-border-surface)] shrink-0 z-20 overflow-hidden"
       >
         {/* Logo */}
@@ -151,7 +151,12 @@ export default function Layout({ children }) {
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Topbar */}
-        <header className="h-14 theme-glass-surface border-b border-[var(--theme-border-surface)] flex items-center px-6 shrink-0">
+        <motion.header
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
+          className="h-14 theme-glass-surface border-b border-[var(--theme-border-surface)] flex items-center px-6 shrink-0"
+        >
           {currentPage && (
             <div className="flex items-center gap-2.5">
               <currentPage.icon className="w-4 h-4 text-[var(--theme-text-muted)]" />
@@ -166,7 +171,7 @@ export default function Layout({ children }) {
           <span className="ml-auto font-data text-[11px] tracking-[0.12em] uppercase text-[var(--theme-text-muted)] bg-[rgba(17,17,17,0.04)] px-2.5 py-1 rounded-[var(--theme-radius-chip)] border border-[var(--theme-border-subtle)] font-medium">
             v2.2
           </span>
-        </header>
+        </motion.header>
 
         {/* Page content */}
         <main className="flex-1 overflow-auto">
