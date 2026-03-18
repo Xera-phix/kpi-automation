@@ -7,8 +7,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Space Grotesk', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        mono: ['IBM Plex Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        sans: ['Helvetica Neue', 'Arial Nova', 'Avenir Next', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'ui-monospace', 'monospace'],
       },
       colors: {
         editorial: {

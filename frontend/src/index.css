@@ -26,20 +26,20 @@
   --theme-opacity-table-header: 1;
 }
 
-html, body, #root {
+html, #root {
   height: 100%;
 }
 
 body {
+  min-height: 100vh;
   background: var(--theme-bg-base);
   color: var(--theme-text-heading);
-  font-family: 'Space Grotesk', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 .font-data {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   font-variant-numeric: tabular-nums;
 }
 

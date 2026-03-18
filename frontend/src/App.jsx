@@ -17,13 +17,15 @@ import { cn } from '@/lib/utils'
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip, Legend)
 
 const API_BASE = '/api'
+const BASELINE_DASH_PATTERN = [4, 5]
+const PREMIUM_EASE = [0.22, 1, 0.36, 1]
 
 const revealItem = {
   hidden: { opacity: 0, y: 14 },
   visible: i => ({
     opacity: 1,
     y: 0,
-    transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1], delay: i * 0.05 },
+    transition: { duration: 0.28, ease: PREMIUM_EASE, delay: i * 0.05 },
   }),
 }
 
@@ -91,7 +93,7 @@ function App() {
     const totalCapacity = resourceAllocation.reduce((sum, r) => sum + (r.capacity || 0), 0)
     const totalCompleted = resourceAllocation.reduce((sum, r) => sum + (r.completed || 0), 0)
     const utilization = totalCapacity > 0 ? Math.round((totalCompleted / totalCapacity) * 100) : 0
-    const velocity = summary.total_completed
+    const earnedValueRatio = summary.total_completed > 0
       ? Number(((summary.total_earned_value || 0) / summary.total_completed).toFixed(2))
       : 0
 
@@ -104,7 +106,7 @@ function App() {
       },
       {
         label: 'Overall Velocity',
-        value: `${velocity}x`,
+        value: `${earnedValueRatio}x`,
         sub: `${Math.round(summary.total_earned_value || 0).toLocaleString()}h earned value`,
         icon: Gauge,
       },
@@ -132,7 +134,7 @@ function App() {
         data: scurveData.baseline || [],
         borderColor: '#161616',
         borderWidth: 1.4,
-        borderDash: [4, 5],
+        borderDash: BASELINE_DASH_PATTERN,
         pointRadius: 0,
       },
       {
@@ -168,7 +170,7 @@ function App() {
           boxHeight: 8,
           usePointStyle: true,
           pointStyle: 'line',
-          font: { family: 'Space Grotesk, sans-serif', size: 11, weight: '600' },
+          font: { family: 'Helvetica Neue, Arial, sans-serif', size: 11, weight: '600' },
         },
       },
       tooltip: {
@@ -176,8 +178,8 @@ function App() {
         titleColor: '#F4F1EA',
         bodyColor: '#F4F1EA',
         borderWidth: 0,
-        titleFont: { family: 'Space Grotesk, sans-serif', size: 12, weight: '700' },
-        bodyFont: { family: 'IBM Plex Mono, monospace', size: 11, weight: '500' },
+        titleFont: { family: 'Helvetica Neue, Arial, sans-serif', size: 12, weight: '700' },
+        bodyFont: { family: 'SFMono-Regular, Menlo, monospace', size: 11, weight: '500' },
       },
     },
     scales: {
@@ -186,7 +188,7 @@ function App() {
         ticks: {
           color: '#474747',
           maxTicksLimit: 8,
-          font: { family: 'IBM Plex Mono, monospace', size: 10, weight: '500' },
+          font: { family: 'SFMono-Regular, Menlo, monospace', size: 10, weight: '500' },
         },
       },
       y: {
@@ -194,7 +196,7 @@ function App() {
         grid: { color: 'rgba(18, 18, 18, 0.08)' },
         ticks: {
           color: '#474747',
-          font: { family: 'IBM Plex Mono, monospace', size: 10, weight: '500' },
+          font: { family: 'SFMono-Regular, Menlo, monospace', size: 10, weight: '500' },
         },
       },
     },
@@ -210,10 +212,13 @@ function App() {
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, transition: { duration: 0.2, ease: 'easeOut' } }}
             className="fixed inset-0 z-50 bg-[var(--theme-bg-base)] border-b border-[var(--theme-border-subtle)] flex items-center justify-center"
+            role="status"
+            aria-live="polite"
+            aria-label="Loading dashboard"
           >
             <div className="text-center">
               <div className="font-data text-[11px] tracking-[0.32em] uppercase text-[var(--theme-text-muted)]">KPI Automation</div>
-              <div className="mt-4 font-data text-[58px] leading-none text-[var(--theme-text-heading)] tabular-nums">{bootProgress}%</div>
+              <div aria-live="polite" className="mt-4 font-data text-[58px] leading-none text-[var(--theme-text-heading)] tabular-nums">{bootProgress}%</div>
             </div>
           </motion.div>
         )}
@@ -223,7 +228,7 @@ function App() {
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1], delay: showBootLoader ? 0.12 : 0 }}
+          transition={{ duration: 0.24, ease: PREMIUM_EASE, delay: showBootLoader ? 0.12 : 0 }}
           className="border border-[var(--theme-border-surface)] bg-[var(--theme-bg-surface)] px-5 py-4"
         >
           <div className="flex items-end justify-between gap-4">
@@ -267,7 +272,7 @@ function App() {
             initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.35 }}
-            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.24, ease: PREMIUM_EASE }}
             className="xl:col-span-8 border border-[var(--theme-border-surface)] bg-[var(--theme-bg-surface)]"
           >
             <div className="px-5 py-4 border-b border-[var(--theme-border-subtle)]">
@@ -287,7 +292,7 @@ function App() {
             initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.3 }}
-            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
+            transition={{ duration: 0.24, ease: PREMIUM_EASE, delay: 0.05 }}
             className="xl:col-span-4 border border-[var(--theme-border-surface)] bg-[var(--theme-bg-surface)]"
           >
             <div className="px-5 py-4 border-b border-[var(--theme-border-subtle)]">
